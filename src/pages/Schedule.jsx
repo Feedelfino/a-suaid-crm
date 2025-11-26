@@ -9,6 +9,7 @@ import {
   ChevronLeft, ChevronRight, Plus, Phone, Video, MapPin,
   User, Clock, Calendar as CalendarIcon, MoreVertical, Edit, Trash2
 } from 'lucide-react';
+import { useAgentNames } from '@/components/hooks/useAgentNames';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +28,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const AGENTS = ['Agente 1', 'Agente 2', 'Agente 3', 'Agente 4'];
 const HOURS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
 
 export default function Schedule() {
@@ -35,6 +35,7 @@ export default function Schedule() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState('week');
   const [selectedAgent, setSelectedAgent] = useState('all');
+  const { agentNamesArray: AGENTS } = useAgentNames();
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['appointments'],

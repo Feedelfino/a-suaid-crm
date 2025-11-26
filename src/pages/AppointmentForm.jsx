@@ -4,6 +4,7 @@ import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Save, Calendar, User, Video, Phone, MapPin } from 'lucide-react';
+import { useAgentNames } from '@/components/hooks/useAgentNames';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,9 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const AGENTS = ['Agente 1', 'Agente 2', 'Agente 3', 'Agente 4'];
-
 export default function AppointmentForm() {
+  const { agentList } = useAgentNames();
   const navigate = useNavigate();
   const urlParams = new URLSearchParams(window.location.search);
   const appointmentId = urlParams.get('id');
@@ -264,8 +264,8 @@ export default function AppointmentForm() {
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {AGENTS.map(agent => (
-                      <SelectItem key={agent} value={agent}>{agent}</SelectItem>
+                    {agentList.map(agent => (
+                      <SelectItem key={agent.key} value={agent.name}>{agent.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
