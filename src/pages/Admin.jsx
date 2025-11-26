@@ -38,7 +38,7 @@ import { Switch } from "@/components/ui/switch";
 
 export default function Admin() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState('users');
+  const [activeTab, setActiveTab] = useState('access');
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -53,6 +53,21 @@ export default function Admin() {
 
   // Check if user is admin
   const isAdmin = user?.role === 'admin';
+
+  // Access Requests
+  const { data: accessRequests = [] } = useQuery({
+    queryKey: ['access-requests'],
+    queryFn: () => base44.entities.UserAccess.list('-created_date'),
+  });
+
+  const updateAccess = useMutation({
+    mutationFn: ({ id, status }) => base44.entities.UserAccess.update(id, { 
+      status,
+      approved_by: user?.email,
+      approved_at: new Date().toISOString(),
+    }),
+    onSuccess: () => queryClient.invalidateQueries(['access-requests']),
+  });
 
   // Users
   const { data: users = [] } = useQuery({
@@ -226,6 +241,10 @@ export default function Admin() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-white shadow-sm border">
+          <TabsTrigger value="access" className="flex items-center gap-2">
+            <Shield className="w-4 h-4" />
+            Acessos
+          </TabsTrigger>
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
             Usuários
@@ -243,6 +262,148 @@ export default function Admin() {
             Metas
           </TabsTrigger>
         </TabsList>
+
+        {/* Access Tab */}
+        <TabsContent value="access" className="mt-6">
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-[#6B2D8B]" />
+                Gerenciar Acessos ao CRM
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!isAdmin ? (
+                <div className="text-center py-8">
+                  <Shield className="w-16 h-16 mx-auto mb-4 text-slate-300" />
+                  <p className="text-slate-500">Apenas administradores podem gerenciar acessos.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Pending Requests */}
+                  <div className="mb-8">
+                    <h3 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                      <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+                      Solicitações Pendentes ({accessRequests.filter(r => r.status === 'pending').length})
+                    </h3>
+                    {accessRequests.filter(r => r.status === 'pending').length === 0 ? (
+                      <p className="text-slate-500 text-sm py-4">Nenhuma solicitação pendente.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {accessRequests.filter(r => r.status === 'pending').map((request) => (
+                          <div key={request.id} className="flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
+                                <Users className="w-6 h-6 text-amber-600" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-slate-800">{request.user_name || 'Usuário'}</p>
+                                <p className="text-sm text-slate-500">{request.user_email}</p>
+                                <p className="text-xs text-slate-400">Solicitado em: {request.created_date ? format(new Date(request.created_date), 'dd/MM/yyyy HH:mm') : '-'}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                onClick={() => updateAccess.mutate({ id: request.id, status: 'approved' })}
+                                className="bg-green-600 hover:bg-green-700"
+                                size="sm"
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Aprovar
+                              </Button>
+                              <Button
+                                onClick={() => updateAccess.mutate({ id: request.id, status: 'rejected' })}
+                                variant="destructive"
+                                size="sm"
+                              >
+                                <XCircle className="w-4 h-4 mr-1" />
+                                Rejeitar
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Approved Users */}
+                  <div className="mb-8">
+                    <h3 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full" />
+                      Usuários Aprovados ({accessRequests.filter(r => r.status === 'approved').length})
+                    </h3>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Usuário</TableHead>
+                          <TableHead>E-mail</TableHead>
+                          <TableHead>Aprovado em</TableHead>
+                          <TableHead>Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {accessRequests.filter(r => r.status === 'approved').map((request) => (
+                          <TableRow key={request.id}>
+                            <TableCell className="font-medium">{request.user_name || '-'}</TableCell>
+                            <TableCell>{request.user_email}</TableCell>
+                            <TableCell>{request.approved_at ? format(new Date(request.approved_at), 'dd/MM/yyyy') : '-'}</TableCell>
+                            <TableCell>
+                              <Button
+                                onClick={() => updateAccess.mutate({ id: request.id, status: 'rejected' })}
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600"
+                              >
+                                Revogar
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Rejected Users */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                      <div className="w-2 h-2 bg-red-500 rounded-full" />
+                      Acessos Negados ({accessRequests.filter(r => r.status === 'rejected').length})
+                    </h3>
+                    {accessRequests.filter(r => r.status === 'rejected').length > 0 && (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Usuário</TableHead>
+                            <TableHead>E-mail</TableHead>
+                            <TableHead>Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {accessRequests.filter(r => r.status === 'rejected').map((request) => (
+                            <TableRow key={request.id}>
+                              <TableCell className="font-medium">{request.user_name || '-'}</TableCell>
+                              <TableCell>{request.user_email}</TableCell>
+                              <TableCell>
+                                <Button
+                                  onClick={() => updateAccess.mutate({ id: request.id, status: 'approved' })}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-green-600"
+                                >
+                                  Aprovar
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Users Tab */}
         <TabsContent value="users" className="mt-6">
