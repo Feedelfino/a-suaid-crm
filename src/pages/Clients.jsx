@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
@@ -38,6 +38,19 @@ export default function Clients() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const userData = await base44.auth.me();
+        setUser(userData);
+      } catch (e) {}
+    };
+    loadUser();
+  }, []);
+
+  const isAdmin = user?.role === 'admin';
 
   const { data: clients = [], refetch } = useQuery({
     queryKey: ['clients'],
@@ -68,6 +81,10 @@ export default function Clients() {
   };
 
   const handleDelete = async (id) => {
+    if (!isAdmin) {
+      alert('Apenas administradores podem excluir clientes.');
+      return;
+    }
     if (window.confirm('Tem certeza que deseja excluir este cliente?')) {
       await base44.entities.Client.delete(id);
       refetch();
@@ -216,13 +233,15 @@ export default function Clients() {
                             Editar
                           </DropdownMenuItem>
                         </Link>
-                        <DropdownMenuItem 
-                          className="text-red-600"
-                          onClick={() => handleDelete(client.id)}
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Excluir
-                        </DropdownMenuItem>
+                        {isAdmin && (
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={() => handleDelete(client.id)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Excluir
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
