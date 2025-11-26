@@ -537,10 +537,9 @@ export default function Admin() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value={null}>Meta da Empresa</SelectItem>
-                          <SelectItem value="Agente 1">Agente 1</SelectItem>
-                          <SelectItem value="Agente 2">Agente 2</SelectItem>
-                          <SelectItem value="Agente 3">Agente 3</SelectItem>
-                          <SelectItem value="Agente 4">Agente 4</SelectItem>
+                          {['agent_1', 'agent_2', 'agent_3', 'agent_4'].map((key) => (
+                            <SelectItem key={key} value={agentNames[key]}>{agentNames[key]}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
