@@ -11,6 +11,9 @@ import Reports from './pages/Reports';
 import DataImport from './pages/DataImport';
 import Admin from './pages/Admin';
 import Tasks from './pages/Tasks';
+import AccessPending from './pages/AccessPending';
+import AccessDenied from './pages/AccessDenied';
+import SalesPipeline from './pages/SalesPipeline';
 import __Layout from './Layout.jsx';
 
 
@@ -28,6 +31,9 @@ export const PAGES = {
     "DataImport": DataImport,
     "Admin": Admin,
     "Tasks": Tasks,
+    "AccessPending": AccessPending,
+    "AccessDenied": AccessDenied,
+    "SalesPipeline": SalesPipeline,
 }
 
 export const pagesConfig = {
