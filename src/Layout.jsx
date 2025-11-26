@@ -19,9 +19,8 @@ import {
   Globe,
   LogOut,
   ChevronDown,
-  Bell,
-  ShieldX,
-  Lock
+  Lock,
+  GitBranch
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -32,33 +31,63 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Card, CardContent } from "@/components/ui/card";
+import AccessPending from '@/pages/AccessPending';
+import AccessDenied from '@/pages/AccessDenied';
+import NotificationCenter from '@/components/notifications/NotificationCenter';
 
 export default function Layout({ children, currentPageName }) {
   const [user, setUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [accessStatus, setAccessStatus] = useState(null); // 'approved', 'pending', 'rejected', null
 
   useEffect(() => {
-    const loadUser = async () => {
+    const checkAccess = async () => {
       try {
         const authenticated = await base44.auth.isAuthenticated();
         if (!authenticated) {
           base44.auth.redirectToLogin();
           return;
         }
+        
         const userData = await base44.auth.me();
         setUser(userData);
-        setIsAuthenticated(true);
+
+        // Admins always have access
+        if (userData.role === 'admin') {
+          setAccessStatus('approved');
+          setIsLoading(false);
+          return;
+        }
+
+        // Check user access status
+        const accessRecords = await base44.entities.UserAccess.filter({ user_email: userData.email });
+        
+        if (accessRecords.length === 0) {
+          // First time user - create pending access request
+          await base44.entities.UserAccess.create({
+            user_email: userData.email,
+            user_name: userData.full_name,
+            status: 'pending',
+          });
+          setAccessStatus('pending');
+        } else {
+          const access = accessRecords[0];
+          setAccessStatus(access.status);
+        }
       } catch (e) {
-        console.log('User not logged in');
+        console.log('Auth error:', e);
         base44.auth.redirectToLogin();
       } finally {
         setIsLoading(false);
       }
     };
-    loadUser();
+    checkAccess();
   }, []);
+
+  const handleLogout = () => {
+    base44.auth.logout();
+  };
 
   // Loading state
   if (isLoading) {
@@ -69,14 +98,24 @@ export default function Layout({ children, currentPageName }) {
             <span className="text-white font-bold text-2xl">A</span>
           </div>
           <div className="animate-spin w-8 h-8 border-4 border-[#6B2D8B] border-t-transparent rounded-full mx-auto" />
-          <p className="text-slate-500 mt-4">Carregando...</p>
+          <p className="text-slate-500 mt-4">Verificando acesso...</p>
         </div>
       </div>
     );
   }
 
-  // Not authenticated or no access
-  if (!isAuthenticated || !user) {
+  // Access pending
+  if (accessStatus === 'pending') {
+    return <AccessPending user={user} onLogout={handleLogout} />;
+  }
+
+  // Access rejected
+  if (accessStatus === 'rejected') {
+    return <AccessDenied user={user} onLogout={handleLogout} />;
+  }
+
+  // Not authenticated
+  if (!user || accessStatus !== 'approved') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
         <Card className="max-w-md w-full border-0 shadow-2xl">
@@ -86,7 +125,7 @@ export default function Layout({ children, currentPageName }) {
             </div>
             <h1 className="text-2xl font-bold text-slate-800 mb-2">Acesso Restrito</h1>
             <p className="text-slate-500 mb-6">
-              Você precisa estar logado para acessar o CRM.
+              Você precisa estar logado e autorizado para acessar o CRM.
             </p>
             <Button 
               onClick={() => base44.auth.redirectToLogin()}
@@ -100,21 +139,21 @@ export default function Layout({ children, currentPageName }) {
     );
   }
 
+  const isAdmin = user?.role === 'admin';
+
   const menuItems = [
     { name: 'Home', icon: Home, page: 'Home' },
     { name: 'Interações', icon: Phone, page: 'Interactions' },
     { name: 'Cadastros', icon: Users, page: 'Clients' },
+    { name: 'Funil de Vendas', icon: GitBranch, page: 'SalesPipeline' },
     { name: 'Agenda Comercial', icon: Calendar, page: 'Schedule' },
     { name: 'Dashboard', icon: BarChart3, page: 'Dashboard' },
     { name: 'Campanhas', icon: Target, page: 'Campaigns' },
     { name: 'Relatórios', icon: FileText, page: 'Reports' },
     { name: 'Banco de Dados', icon: Database, page: 'DataImport' },
-    { name: 'Administração', icon: Settings, page: 'Admin' },
+    // Admin menu only visible to admins
+    ...(isAdmin ? [{ name: 'Administração', icon: Settings, page: 'Admin' }] : []),
   ];
-
-  const handleLogout = () => {
-    base44.auth.logout();
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -268,10 +307,7 @@ export default function Layout({ children, currentPageName }) {
             </div>
 
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="w-5 h-5 text-slate-500" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-[#C71585] rounded-full" />
-              </Button>
+              <NotificationCenter userEmail={user?.email} />
 
               {user && (
                 <DropdownMenu>
@@ -285,7 +321,7 @@ export default function Layout({ children, currentPageName }) {
                       </Avatar>
                       <div className="hidden md:block text-left">
                         <p className="text-sm font-medium text-slate-700">{user.full_name}</p>
-                        <p className="text-xs text-slate-500 capitalize">{user.role || 'Agente'}</p>
+                        <p className="text-xs text-slate-500 capitalize">{user.role === 'admin' ? 'Administrador' : 'Agente'}</p>
                       </div>
                       <ChevronDown className="w-4 h-4 text-slate-400 hidden md:block" />
                     </button>
