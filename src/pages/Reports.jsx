@@ -7,6 +7,7 @@ import {
   FileText, Download, Filter, Calendar, Users, 
   DollarSign, BarChart3, TrendingUp
 } from 'lucide-react';
+import { useAgentNames } from '@/components/hooks/useAgentNames';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ export default function Reports() {
   const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
   const [agentFilter, setAgentFilter] = useState('all');
+  const { agentList } = useAgentNames();
 
   const { data: interactions = [] } = useQuery({
     queryKey: ['report-interactions'],
@@ -75,8 +77,8 @@ export default function Reports() {
   );
 
   // Agent performance data
-  const agentData = ['Agente 1', 'Agente 2', 'Agente 3', 'Agente 4'].map(agent => {
-    const agentInteractions = filteredInteractions.filter(i => i.agent_name?.includes(agent.split(' ')[1]));
+  const agentData = agentList.map(({ name: agent }) => {
+    const agentInteractions = filteredInteractions.filter(i => i.agent_name === agent);
     const agentSales = agentInteractions.filter(i => i.tabulation === 'venda_feita');
     const agentAppointments = filteredAppointments.filter(a => a.agent === agent);
     
@@ -166,10 +168,9 @@ export default function Reports() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os Agentes</SelectItem>
-                  <SelectItem value="Agente 1">Agente 1</SelectItem>
-                  <SelectItem value="Agente 2">Agente 2</SelectItem>
-                  <SelectItem value="Agente 3">Agente 3</SelectItem>
-                  <SelectItem value="Agente 4">Agente 4</SelectItem>
+                  {agentList.map(agent => (
+                    <SelectItem key={agent.key} value={agent.name}>{agent.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
