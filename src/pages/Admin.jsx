@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { 
   Settings, Users, Package, Target, Plus, Edit, Trash2, 
-  Shield, CheckCircle, XCircle
+  Shield, CheckCircle, XCircle, UserCog, Save
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,20 @@ import { Switch } from "@/components/ui/switch";
 export default function Admin() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('users');
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const userData = await base44.auth.me();
+        setUser(userData);
+      } catch (e) {}
+    };
+    loadUser();
+  }, []);
+
+  // Check if user is admin
+  const isAdmin = user?.role === 'admin';
 
   // Users
   const { data: users = [] } = useQuery({
@@ -57,6 +71,47 @@ export default function Admin() {
     queryKey: ['admin-goals'],
     queryFn: () => base44.entities.Goal.list('-month'),
   });
+
+  // Agent Configs
+  const { data: agentConfigs = [] } = useQuery({
+    queryKey: ['agent-configs'],
+    queryFn: () => base44.entities.AgentConfig.list(),
+  });
+
+  const [agentNames, setAgentNames] = useState({
+    agent_1: 'Agente 1',
+    agent_2: 'Agente 2',
+    agent_3: 'Agente 3',
+    agent_4: 'Agente 4',
+  });
+
+  useEffect(() => {
+    if (agentConfigs.length > 0) {
+      const names = { ...agentNames };
+      agentConfigs.forEach(config => {
+        if (config.agent_key && config.display_name) {
+          names[config.agent_key] = config.display_name;
+        }
+      });
+      setAgentNames(names);
+    }
+  }, [agentConfigs]);
+
+  const saveAgentConfig = useMutation({
+    mutationFn: async ({ key, name }) => {
+      const existing = agentConfigs.find(c => c.agent_key === key);
+      if (existing) {
+        return base44.entities.AgentConfig.update(existing.id, { display_name: name });
+      } else {
+        return base44.entities.AgentConfig.create({ agent_key: key, display_name: name, active: true });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['agent-configs']);
+    },
+  });
+
+  const [savingAgent, setSavingAgent] = useState(null);
 
   // Product Form
   const [productDialog, setProductDialog] = useState(false);
@@ -175,6 +230,10 @@ export default function Admin() {
             <Users className="w-4 h-4" />
             Usuários
           </TabsTrigger>
+          <TabsTrigger value="agents" className="flex items-center gap-2">
+            <UserCog className="w-4 h-4" />
+            Agentes
+          </TabsTrigger>
           <TabsTrigger value="products" className="flex items-center gap-2">
             <Package className="w-4 h-4" />
             Produtos
@@ -228,6 +287,63 @@ export default function Admin() {
               </Table>
               {users.length === 0 && (
                 <p className="text-center py-8 text-slate-500">Nenhum usuário cadastrado</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Agents Tab */}
+        <TabsContent value="agents" className="mt-6">
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserCog className="w-5 h-5 text-[#6B2D8B]" />
+                Configurar Nomes dos Agentes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!isAdmin ? (
+                <div className="text-center py-8">
+                  <Shield className="w-16 h-16 mx-auto mb-4 text-slate-300" />
+                  <p className="text-slate-500">Apenas administradores podem alterar os nomes dos agentes.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {['agent_1', 'agent_2', 'agent_3', 'agent_4'].map((key, index) => (
+                    <div key={key} className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#6B2D8B] to-[#8B4DAB] flex items-center justify-center text-white font-bold">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <Label className="text-xs text-slate-500 uppercase">Agente {index + 1}</Label>
+                        <Input
+                          value={agentNames[key]}
+                          onChange={(e) => setAgentNames({ ...agentNames, [key]: e.target.value })}
+                          placeholder={`Nome do Agente ${index + 1}`}
+                          className="mt-1"
+                        />
+                      </div>
+                      <Button
+                        onClick={async () => {
+                          setSavingAgent(key);
+                          await saveAgentConfig.mutateAsync({ key, name: agentNames[key] });
+                          setSavingAgent(null);
+                        }}
+                        disabled={savingAgent === key}
+                        className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]"
+                      >
+                        {savingAgent === key ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+                  ))}
+                  <p className="text-sm text-slate-500 mt-4">
+                    Os nomes configurados aqui serão usados em toda a aplicação (agenda, tarefas, relatórios, etc).
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
