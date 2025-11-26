@@ -1,0 +1,315 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { base44 } from '@/api/base44Client';
+import { ArrowLeft, Save, User, Building2, Phone, Mail, MapPin } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+export default function ClientForm() {
+  const navigate = useNavigate();
+  const urlParams = new URLSearchParams(window.location.search);
+  const clientId = urlParams.get('id');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const [formData, setFormData] = useState({
+    client_name: '',
+    company_name: '',
+    cpf: '',
+    cnpj: '',
+    phone: '',
+    whatsapp: '',
+    email: '',
+    business_area: '',
+    lead_status: 'novo',
+    lead_source: '',
+    notes: '',
+  });
+
+  useEffect(() => {
+    if (clientId) {
+      loadClient();
+    }
+  }, [clientId]);
+
+  const loadClient = async () => {
+    setIsLoading(true);
+    try {
+      const clients = await base44.entities.Client.filter({ id: clientId });
+      if (clients.length > 0) {
+        setFormData(clients[0]);
+      }
+    } catch (error) {
+      console.error('Error loading client:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    
+    try {
+      if (clientId) {
+        await base44.entities.Client.update(clientId, formData);
+      } else {
+        await base44.entities.Client.create(formData);
+      }
+      navigate(createPageUrl('Clients'));
+    } catch (error) {
+      console.error('Error saving client:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin w-8 h-8 border-4 border-[#6B2D8B] border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Button 
+          variant="ghost" 
+          size="icon"
+          onClick={() => navigate(-1)}
+          className="rounded-xl"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">
+            {clientId ? 'Editar Cliente' : 'Novo Cliente'}
+          </h1>
+          <p className="text-slate-500">Preencha os dados do cliente</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        <div className="grid gap-6">
+          {/* Personal Info */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <User className="w-5 h-5 text-[#6B2D8B]" />
+                Dados Pessoais
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="client_name">Nome do Cliente *</Label>
+                <Input
+                  id="client_name"
+                  value={formData.client_name}
+                  onChange={(e) => handleChange('client_name', e.target.value)}
+                  placeholder="Nome completo"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cpf">CPF</Label>
+                <Input
+                  id="cpf"
+                  value={formData.cpf}
+                  onChange={(e) => handleChange('cpf', e.target.value)}
+                  placeholder="000.000.000-00"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Company Info */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-[#6B2D8B]" />
+                Dados da Empresa
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="company_name">Nome da Empresa</Label>
+                <Input
+                  id="company_name"
+                  value={formData.company_name}
+                  onChange={(e) => handleChange('company_name', e.target.value)}
+                  placeholder="Razão social"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cnpj">CNPJ</Label>
+                <Input
+                  id="cnpj"
+                  value={formData.cnpj}
+                  onChange={(e) => handleChange('cnpj', e.target.value)}
+                  placeholder="00.000.000/0000-00"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="business_area">Área de Atuação</Label>
+                <Input
+                  id="business_area"
+                  value={formData.business_area}
+                  onChange={(e) => handleChange('business_area', e.target.value)}
+                  placeholder="Ex: Tecnologia, Comércio, Serviços..."
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Contact Info */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Phone className="w-5 h-5 text-[#6B2D8B]" />
+                Contato
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Telefone</Label>
+                <Input
+                  id="phone"
+                  value={formData.phone}
+                  onChange={(e) => handleChange('phone', e.target.value)}
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp">WhatsApp</Label>
+                <Input
+                  id="whatsapp"
+                  value={formData.whatsapp}
+                  onChange={(e) => handleChange('whatsapp', e.target.value)}
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="email">E-mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleChange('email', e.target.value)}
+                  placeholder="email@exemplo.com"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Status & Source */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-[#6B2D8B]" />
+                Classificação
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Status do Lead</Label>
+                <Select 
+                  value={formData.lead_status} 
+                  onValueChange={(v) => handleChange('lead_status', v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="novo">Novo</SelectItem>
+                    <SelectItem value="em_contato">Em Contato</SelectItem>
+                    <SelectItem value="qualificado">Qualificado</SelectItem>
+                    <SelectItem value="negociando">Negociando</SelectItem>
+                    <SelectItem value="fechado">Fechado</SelectItem>
+                    <SelectItem value="perdido">Perdido</SelectItem>
+                    <SelectItem value="indeciso">Indeciso</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Origem do Lead</Label>
+                <Select 
+                  value={formData.lead_source || ''} 
+                  onValueChange={(v) => handleChange('lead_source', v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="indicacao">Indicação</SelectItem>
+                    <SelectItem value="instagram">Instagram</SelectItem>
+                    <SelectItem value="google_ads">Google Ads</SelectItem>
+                    <SelectItem value="linkedin">LinkedIn</SelectItem>
+                    <SelectItem value="organico">Orgânico</SelectItem>
+                    <SelectItem value="outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="notes">Observações</Label>
+                <Textarea
+                  id="notes"
+                  value={formData.notes}
+                  onChange={(e) => handleChange('notes', e.target.value)}
+                  placeholder="Anotações sobre o cliente..."
+                  rows={4}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Actions */}
+          <div className="flex justify-end gap-4">
+            <Button 
+              type="button" 
+              variant="outline"
+              onClick={() => navigate(-1)}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={isSaving}
+              className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]"
+            >
+              {isSaving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Salvar Cliente
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
