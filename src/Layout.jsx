@@ -19,7 +19,9 @@ import {
   Globe,
   LogOut,
   ChevronDown,
-  Bell
+  Bell,
+  ShieldX,
+  Lock
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -29,22 +31,74 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function Layout({ children, currentPageName }) {
   const [user, setUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
       try {
+        const authenticated = await base44.auth.isAuthenticated();
+        if (!authenticated) {
+          base44.auth.redirectToLogin();
+          return;
+        }
         const userData = await base44.auth.me();
         setUser(userData);
+        setIsAuthenticated(true);
       } catch (e) {
         console.log('User not logged in');
+        base44.auth.redirectToLogin();
+      } finally {
+        setIsLoading(false);
       }
     };
     loadUser();
   }, []);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-[#6B2D8B] to-[#C71585] flex items-center justify-center shadow-lg animate-pulse">
+            <span className="text-white font-bold text-2xl">A</span>
+          </div>
+          <div className="animate-spin w-8 h-8 border-4 border-[#6B2D8B] border-t-transparent rounded-full mx-auto" />
+          <p className="text-slate-500 mt-4">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not authenticated or no access
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full border-0 shadow-2xl">
+          <CardContent className="p-8 text-center">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#6B2D8B] to-[#C71585] flex items-center justify-center shadow-lg">
+              <Lock className="w-10 h-10 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">Acesso Restrito</h1>
+            <p className="text-slate-500 mb-6">
+              Você precisa estar logado para acessar o CRM.
+            </p>
+            <Button 
+              onClick={() => base44.auth.redirectToLogin()}
+              className="w-full bg-gradient-to-r from-[#6B2D8B] to-[#C71585]"
+            >
+              Fazer Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const menuItems = [
     { name: 'Home', icon: Home, page: 'Home' },
