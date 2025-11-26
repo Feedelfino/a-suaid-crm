@@ -13,10 +13,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart as RePieChart, Pie, Cell, LineChart, Line, Legend
+  PieChart as RePieChart, Pie, Cell, LineChart, Line, Legend, Funnel, FunnelChart, LabelList
 } from 'recharts';
 
 const COLORS = ['#6B2D8B', '#C71585', '#8B4DAB', '#FF6B9D', '#FFD700', '#00CED1'];
+
+const FUNNEL_STAGES = [
+  { id: 'lead', name: 'Lead' },
+  { id: 'contato', name: 'Contato' },
+  { id: 'qualificacao', name: 'Qualificação' },
+  { id: 'proposta', name: 'Proposta' },
+  { id: 'negociacao', name: 'Negociação' },
+  { id: 'fechamento', name: 'Fechamento' },
+];
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
@@ -56,6 +65,16 @@ export default function Dashboard() {
   const { data: tasks = [] } = useQuery({
     queryKey: ['dashboard-tasks'],
     queryFn: () => base44.entities.Task.list(),
+  });
+
+  // Funnel data
+  const funnelData = FUNNEL_STAGES.map((stage, index) => {
+    const count = clients.filter(c => (c.funnel_stage || 'lead') === stage.id).length;
+    return {
+      name: stage.name,
+      value: count,
+      fill: COLORS[index % COLORS.length],
+    };
   });
 
   const currentMonth = new Date();
@@ -250,23 +269,27 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            {/* Products */}
+            {/* Funnel Chart */}
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <BarChart3 className="w-5 h-5 text-[#6B2D8B]" />
-                  Produtos Oferecidos
+                  Funil de Vendas
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={productData} layout="vertical">
+                    <BarChart data={funnelData} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis type="number" />
                       <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
                       <Tooltip />
-                      <Bar dataKey="value" fill="#6B2D8B" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                        {funnelData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
