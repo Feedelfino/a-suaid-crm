@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { 
   Plus, Target, Calendar, Users, TrendingUp, 
-  MoreVertical, Edit, Trash2, Play, Pause, Archive
+  MoreVertical, Edit, Trash2, Play, Pause, Archive, GitBranch
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -143,6 +143,13 @@ export default function Campaigns() {
           <h1 className="text-2xl font-bold text-slate-800">Campanhas</h1>
           <p className="text-slate-500">Gerencie suas campanhas de vendas</p>
         </div>
+        <div className="flex gap-3">
+          <Link to={createPageUrl('SalesPipeline')}>
+            <Button variant="outline" className="border-[#6B2D8B] text-[#6B2D8B]">
+              <GitBranch className="w-4 h-4 mr-2" />
+              Ver Funil de Vendas
+            </Button>
+          </Link>
         <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
             <Button className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]">
@@ -256,6 +263,7 @@ export default function Campaigns() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Stats */}
