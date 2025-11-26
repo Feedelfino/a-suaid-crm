@@ -17,8 +17,10 @@ import {
   TrendingUp,
   Users,
   Target,
-  Zap
+  Zap,
+  GitBranch
 } from 'lucide-react';
+import { checkAndCreateNotifications } from '@/components/notifications/NotificationGenerator';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +34,8 @@ export default function Home() {
       try {
         const userData = await base44.auth.me();
         setUser(userData);
+        // Generate notifications for the user
+        checkAndCreateNotifications(userData.email);
       } catch (e) {
         console.log('Not logged in');
       }
@@ -111,6 +115,12 @@ export default function Home() {
               <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
                 <Calendar className="w-4 h-4 mr-2" />
                 Ver Agenda
+              </Button>
+            </Link>
+            <Link to={createPageUrl('SalesPipeline')}>
+              <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
+                <GitBranch className="w-4 h-4 mr-2" />
+                Funil de Vendas
               </Button>
             </Link>
           </div>
