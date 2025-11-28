@@ -29,6 +29,7 @@ import { Progress } from "@/components/ui/progress";
 
 export default function Home() {
   const [user, setUser] = useState(null);
+  const { getDisplayName } = useUserDisplayName();
 
   useEffect(() => {
     const loadUser = async () => {
@@ -100,7 +101,7 @@ export default function Home() {
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
         <div className="relative z-10">
           <h1 className="text-3xl font-bold mb-2">
-            Olá, {user?.full_name?.split(' ')[0] || 'Usuário'}! 👋
+            Olá, {getDisplayName(user?.email, user?.full_name?.split(' ')[0]) || 'Usuário'}! 👋
           </h1>
           <p className="text-white/80 mb-6">
             {format(new Date(), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
