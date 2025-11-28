@@ -17,6 +17,7 @@ import SalesPipeline from './pages/SalesPipeline';
 import Notes from './pages/Notes';
 import Chat from './pages/Chat';
 import Renewals from './pages/Renewals';
+import AgentPerformance from './pages/AgentPerformance';
 import __Layout from './Layout.jsx';
 
 
@@ -40,6 +41,7 @@ export const PAGES = {
     "Notes": Notes,
     "Chat": Chat,
     "Renewals": Renewals,
+    "AgentPerformance": AgentPerformance,
 }
 
 export const pagesConfig = {
