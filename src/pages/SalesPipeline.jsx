@@ -7,17 +7,25 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { format, parseISO } from 'date-fns';
 import { 
   Users, Phone, Mail, Building2, ArrowRight, 
-  MoreVertical, Eye, DollarSign, TrendingUp
+  MoreVertical, Eye, DollarSign, TrendingUp, Sparkles, Zap
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import LeadScoreCard, { calculateLeadScore, getNextBestAction } from '@/components/pipeline/LeadScoreCard';
 
 const FUNNEL_STAGES = [
   { id: 'lead', name: 'Lead', color: 'from-slate-400 to-slate-500' },
@@ -31,10 +39,21 @@ const FUNNEL_STAGES = [
 
 export default function SalesPipeline() {
   const queryClient = useQueryClient();
+  const [showScores, setShowScores] = useState(true);
 
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ['pipeline-clients'],
     queryFn: () => base44.entities.Client.list('-updated_date'),
+  });
+
+  const { data: interactions = [] } = useQuery({
+    queryKey: ['pipeline-interactions'],
+    queryFn: () => base44.entities.Interaction.list('-created_date', 500),
+  });
+
+  const { data: appointments = [] } = useQuery({
+    queryKey: ['pipeline-appointments'],
+    queryFn: () => base44.entities.Appointment.list('-date', 200),
   });
 
   const updateClient = useMutation({
@@ -96,7 +115,16 @@ export default function SalesPipeline() {
           <h1 className="text-2xl font-bold text-slate-800">Funil de Vendas</h1>
           <p className="text-slate-500">Arraste os clientes entre as etapas</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-4 items-center">
+          <Button
+            variant={showScores ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowScores(!showScores)}
+            className={showScores ? "bg-gradient-to-r from-[#6B2D8B] to-[#C71585]" : ""}
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Lead Score AI
+          </Button>
           <Card className="border-0 shadow-md px-4 py-2">
             <div className="flex items-center gap-3">
               <Users className="w-5 h-5 text-[#6B2D8B]" />
@@ -210,6 +238,22 @@ export default function SalesPipeline() {
                                     </Badge>
                                   )}
                                 </div>
+                                
+                                {/* AI Lead Score */}
+                                {showScores && (() => {
+                                  const scoreData = calculateLeadScore(client, interactions, appointments);
+                                  const nextAction = getNextBestAction(client, interactions, appointments);
+                                  return (
+                                    <div className="mt-2 pt-2 border-t border-slate-100">
+                                      <LeadScoreCard 
+                                        score={scoreData.score} 
+                                        trend={scoreData.trend}
+                                        nextAction={nextAction}
+                                      />
+                                    </div>
+                                  );
+                                })()}
+                                
                                 {client.funnel_updated_at && (
                                   <p className="text-xs text-slate-400 mt-2">
                                     Atualizado: {format(parseISO(client.funnel_updated_at), 'dd/MM HH:mm')}
