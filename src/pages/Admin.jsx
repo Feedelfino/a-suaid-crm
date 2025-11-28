@@ -129,6 +129,7 @@ export default function Admin() {
 
   const [savingAgent, setSavingAgent] = useState(null);
   const [approvingUser, setApprovingUser] = useState(null);
+  const [editingUserRoles, setEditingUserRoles] = useState(null);
   const [selectedRoles, setSelectedRoles] = useState([]);
 
   const AVAILABLE_ROLES = [
@@ -137,6 +138,15 @@ export default function Admin() {
     { value: 'agente_registro', label: 'Agente de Registro', description: 'Emissão e renovação de certificados' },
     { value: 'agente_comercial', label: 'Agente Comercial', description: 'Vendas e relacionamento com clientes' },
   ];
+
+  const updateUserRoles = useMutation({
+    mutationFn: ({ id, roles }) => base44.entities.UserAccess.update(id, { roles }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['access-requests']);
+      setEditingUserRoles(null);
+      setSelectedRoles([]);
+    },
+  });
 
   const approveWithRoles = useMutation({
     mutationFn: ({ id, roles }) => base44.entities.UserAccess.update(id, { 
@@ -264,18 +274,10 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-white shadow-sm border">
+        <TabsList className="bg-white shadow-sm border flex-wrap">
           <TabsTrigger value="access" className="flex items-center gap-2">
             <Shield className="w-4 h-4" />
-            Acessos
-          </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            Usuários
-          </TabsTrigger>
-          <TabsTrigger value="agents" className="flex items-center gap-2">
-            <UserCog className="w-4 h-4" />
-            Agentes
+            Acessos e Funções
           </TabsTrigger>
           <TabsTrigger value="products" className="flex items-center gap-2">
             <Package className="w-4 h-4" />
@@ -444,20 +446,91 @@ export default function Admin() {
                             </TableCell>
                             <TableCell>{request.approved_at ? format(new Date(request.approved_at), 'dd/MM/yyyy') : '-'}</TableCell>
                             <TableCell>
-                              <Button
-                                onClick={() => updateAccess.mutate({ id: request.id, status: 'rejected' })}
-                                variant="ghost"
-                                size="sm"
-                                className="text-red-600"
-                              >
-                                Revogar
-                              </Button>
+                              <div className="flex gap-2">
+                                <Button
+                                  onClick={() => {
+                                    setEditingUserRoles(request);
+                                    setSelectedRoles(request.roles || []);
+                                  }}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-[#6B2D8B]"
+                                >
+                                  <Edit className="w-4 h-4 mr-1" />
+                                  Editar
+                                </Button>
+                                <Button
+                                  onClick={() => updateAccess.mutate({ id: request.id, status: 'rejected' })}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-600"
+                                >
+                                  Revogar
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   </div>
+
+                  {/* Edit Roles Dialog */}
+                  <Dialog open={!!editingUserRoles} onOpenChange={(open) => { if (!open) { setEditingUserRoles(null); setSelectedRoles([]); } }}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Editar Funções do Usuário</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="p-3 bg-slate-50 rounded-lg">
+                          <p className="font-medium">{editingUserRoles?.user_name}</p>
+                          <p className="text-sm text-slate-500">{editingUserRoles?.user_email}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium mb-3 block">Funções do usuário:</Label>
+                          <div className="space-y-3">
+                            {AVAILABLE_ROLES.map(role => (
+                              <label
+                                key={role.value}
+                                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                                  selectedRoles.includes(role.value) 
+                                    ? 'bg-[#6B2D8B]/5 border-[#6B2D8B]' 
+                                    : 'bg-white border-slate-200 hover:bg-slate-50'
+                                }`}
+                              >
+                                <Checkbox
+                                  checked={selectedRoles.includes(role.value)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setSelectedRoles([...selectedRoles, role.value]);
+                                    } else {
+                                      setSelectedRoles(selectedRoles.filter(r => r !== role.value));
+                                    }
+                                  }}
+                                />
+                                <div>
+                                  <p className="font-medium text-slate-800">{role.label}</p>
+                                  <p className="text-xs text-slate-500">{role.description}</p>
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-3 pt-4">
+                          <Button variant="outline" onClick={() => { setEditingUserRoles(null); setSelectedRoles([]); }}>
+                            Cancelar
+                          </Button>
+                          <Button
+                            onClick={() => updateUserRoles.mutate({ id: editingUserRoles.id, roles: selectedRoles })}
+                            disabled={selectedRoles.length === 0}
+                            className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]"
+                          >
+                            Salvar Funções
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
 
                   {/* Rejected Users */}
                   <div>
@@ -501,110 +574,7 @@ export default function Admin() {
           </Card>
         </TabsContent>
 
-        {/* Users Tab */}
-        <TabsContent value="users" className="mt-6">
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-[#6B2D8B]" />
-                Usuários do Sistema
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>E-mail</TableHead>
-                    <TableHead>Função</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.full_name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        <Badge className={user.role === 'admin' ? 
-                          'bg-purple-100 text-purple-700' : 
-                          'bg-blue-100 text-blue-700'
-                        }>
-                          {user.role === 'admin' ? 'Administrador' : 'Usuário'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className="bg-green-100 text-green-700">
-                          Ativo
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {users.length === 0 && (
-                <p className="text-center py-8 text-slate-500">Nenhum usuário cadastrado</p>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        {/* Agents Tab */}
-        <TabsContent value="agents" className="mt-6">
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <UserCog className="w-5 h-5 text-[#6B2D8B]" />
-                Configurar Nomes dos Agentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!isAdmin ? (
-                <div className="text-center py-8">
-                  <Shield className="w-16 h-16 mx-auto mb-4 text-slate-300" />
-                  <p className="text-slate-500">Apenas administradores podem alterar os nomes dos agentes.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {['agent_1', 'agent_2', 'agent_3', 'agent_4'].map((key, index) => (
-                    <div key={key} className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#6B2D8B] to-[#8B4DAB] flex items-center justify-center text-white font-bold">
-                        {index + 1}
-                      </div>
-                      <div className="flex-1">
-                        <Label className="text-xs text-slate-500 uppercase">Agente {index + 1}</Label>
-                        <Input
-                          value={agentNames[key]}
-                          onChange={(e) => setAgentNames({ ...agentNames, [key]: e.target.value })}
-                          placeholder={`Nome do Agente ${index + 1}`}
-                          className="mt-1"
-                        />
-                      </div>
-                      <Button
-                        onClick={async () => {
-                          setSavingAgent(key);
-                          await saveAgentConfig.mutateAsync({ key, name: agentNames[key] });
-                          setSavingAgent(null);
-                        }}
-                        disabled={savingAgent === key}
-                        className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]"
-                      >
-                        {savingAgent === key ? (
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Save className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </div>
-                  ))}
-                  <p className="text-sm text-slate-500 mt-4">
-                    Os nomes configurados aqui serão usados em toda a aplicação (agenda, tarefas, relatórios, etc).
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         {/* Products Tab */}
         <TabsContent value="products" className="mt-6">
