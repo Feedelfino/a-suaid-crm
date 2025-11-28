@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
 import {
   Select,
   SelectContent,
@@ -64,6 +65,7 @@ const getFunnelStageFromInteraction = (interactionType, tabulation) => {
 
 export default function InteractionForm({ onSubmit, onCancel, isLoading, clientId, clientName }) {
   const [user, setUser] = useState(null);
+  const { getDisplayName } = useUserDisplayName();
   const [formData, setFormData] = useState({
     interaction_type: '',
     contact_method: '',
@@ -123,7 +125,8 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading, clientI
         await base44.entities.Appointment.create({
           client_id: clientId,
           client_name: clientName,
-          agent: user?.full_name,
+          agent: getDisplayName(user?.email, user?.full_name),
+          agent_email: user?.email,
           appointment_type: formData.followup_method === 'telefone' ? 'telefone' : 
                            formData.followup_method === 'whatsapp' ? 'telefone' : 'videoconferencia',
           date: formData.followup_date.split('T')[0],
@@ -140,7 +143,8 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading, clientI
           task_type: 'followup',
           client_id: clientId,
           client_name: clientName,
-          agent: user?.full_name,
+          agent: getDisplayName(user?.email, user?.full_name),
+          agent_email: user?.email,
           due_date: formData.followup_date,
           status: 'pendente',
         });
