@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
+import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
 import { useQuery } from '@tanstack/react-query';
 import { format, isToday, parseISO, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
