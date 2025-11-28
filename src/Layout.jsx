@@ -20,7 +20,10 @@ import {
   LogOut,
   ChevronDown,
   Lock,
-  GitBranch
+  GitBranch,
+  StickyNote,
+  MessageSquare,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -141,6 +144,15 @@ export default function Layout({ children, currentPageName }) {
 
   const isAdmin = user?.role === 'admin';
 
+  // Check if user has specific role
+  const userAccess = null; // Will be loaded from context if needed
+  const hasRole = (role) => {
+    // Admin has all permissions
+    if (isAdmin) return true;
+    // Check user roles from access record
+    return false; // Default for now, will be enhanced
+  };
+
   const menuItems = [
     { name: 'Home', icon: Home, page: 'Home' },
     { name: 'Interações', icon: Phone, page: 'Interactions' },
@@ -150,7 +162,10 @@ export default function Layout({ children, currentPageName }) {
     { name: 'Dashboard', icon: BarChart3, page: 'Dashboard' },
     { name: 'Campanhas', icon: Target, page: 'Campaigns' },
     { name: 'Relatórios', icon: FileText, page: 'Reports' },
+    { name: 'Renovações', icon: RefreshCw, page: 'Renewals' },
     { name: 'Banco de Dados', icon: Database, page: 'DataImport' },
+    { name: 'Notas', icon: StickyNote, page: 'Notes' },
+    { name: 'Chat', icon: MessageSquare, page: 'Chat' },
     // Admin menu only visible to admins
     ...(isAdmin ? [{ name: 'Administração', icon: Settings, page: 'Admin' }] : []),
   ];
