@@ -34,8 +34,19 @@ export default function Schedule() {
   const queryClient = useQueryClient();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState('week');
-  const [selectedAgent, setSelectedAgent] = useState('all');
+  const [selectedAgent, setSelectedAgent] = useState('mine'); // Default: minha agenda
+  const [user, setUser] = useState(null);
   const { agentNamesArray: AGENTS } = useAgentNames();
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const userData = await base44.auth.me();
+        setUser(userData);
+      } catch (e) {}
+    };
+    loadUser();
+  }, []);
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['appointments'],
@@ -50,9 +61,11 @@ export default function Schedule() {
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  const filteredAppointments = appointments.filter(apt => 
-    selectedAgent === 'all' || apt.agent === selectedAgent
-  );
+  const filteredAppointments = appointments.filter(apt => {
+    if (selectedAgent === 'all') return true;
+    if (selectedAgent === 'mine') return apt.agent === user?.full_name;
+    return apt.agent === selectedAgent;
+  });
 
   const getAppointmentsForSlot = (date, hour, agent) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -161,11 +174,12 @@ export default function Schedule() {
         </div>
         <div className="flex items-center gap-3">
           <Select value={selectedAgent} onValueChange={setSelectedAgent}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-48">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos os Agentes</SelectItem>
+              <SelectItem value="mine">Minha Agenda</SelectItem>
+              <SelectItem value="all">Agenda Geral</SelectItem>
               {AGENTS.map(agent => (
                 <SelectItem key={agent} value={agent}>{agent}</SelectItem>
               ))}
@@ -246,11 +260,20 @@ export default function Schedule() {
                   </div>
                   {weekDays.map((day) => {
                     const dayAppointments = getAppointmentsForSlot(day, hour, selectedAgent);
+                    const dateStr = format(day, 'yyyy-MM-dd');
                     return (
                       <div 
                         key={`${day}-${hour}`} 
-                        className={`p-1 border-l min-h-[80px] ${isToday(day) ? 'bg-[#6B2D8B]/5' : ''}`}
+                        className={`p-1 border-l min-h-[80px] relative group ${isToday(day) ? 'bg-[#6B2D8B]/5' : ''}`}
                       >
+                        <Link 
+                          to={createPageUrl(`AppointmentForm?date=${dateStr}&time=${hour}`)}
+                          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Button size="icon" variant="ghost" className="h-6 w-6 bg-white shadow-sm hover:bg-slate-100">
+                            <Plus className="w-3 h-3 text-[#6B2D8B]" />
+                          </Button>
+                        </Link>
                         <div className="space-y-1">
                           {dayAppointments.map(apt => (
                             <AppointmentCard key={apt.id} apt={apt} compact />
