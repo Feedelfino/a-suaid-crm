@@ -60,9 +60,11 @@ export default function ClientDetails() {
       client_id: clientId,
       client_name: client?.client_name,
       agent_name: user?.full_name,
+      agent_email: user?.email,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries(['interactions', clientId]);
+      queryClient.invalidateQueries(['client', clientId]);
       setShowInteractionForm(false);
     },
   });
@@ -158,17 +160,19 @@ export default function ClientDetails() {
         <div className="lg:col-span-2 space-y-6">
           {showInteractionForm && (
             <Card className="border-0 shadow-lg border-l-4 border-l-[#6B2D8B]">
-              <CardHeader>
-                <CardTitle className="text-lg">Registrar Interação</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <InteractionForm
-                  onSubmit={(data) => createInteractionMutation.mutate(data)}
-                  onCancel={() => setShowInteractionForm(false)}
-                  isLoading={createInteractionMutation.isPending}
-                />
-              </CardContent>
-            </Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Registrar Interação</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <InteractionForm
+                    onSubmit={(data) => createInteractionMutation.mutate(data)}
+                    onCancel={() => setShowInteractionForm(false)}
+                    isLoading={createInteractionMutation.isPending}
+                    clientId={clientId}
+                    clientName={client?.client_name}
+                  />
+                </CardContent>
+              </Card>
           )}
 
           <Card className="border-0 shadow-lg">
@@ -196,9 +200,16 @@ export default function ClientDetails() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <p className="font-medium text-slate-800 capitalize">
-                                {interaction.interaction_type?.replace('_', ' ')}
-                              </p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-slate-800 capitalize">
+                                  {interaction.interaction_type?.replace('_', ' ')}
+                                </p>
+                                {interaction.protocol_number && (
+                                  <Badge variant="outline" className="text-xs font-mono">
+                                    #{interaction.protocol_number}
+                                  </Badge>
+                                )}
+                              </div>
                               {interaction.product_offered && (
                                 <p className="text-sm text-slate-500">
                                   Produto: {interaction.product_offered.replace('_', ' ')}
