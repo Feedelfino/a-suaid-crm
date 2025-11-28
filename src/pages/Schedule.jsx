@@ -10,6 +10,7 @@ import {
   User, Clock, Calendar as CalendarIcon, MoreVertical, Edit, Trash2
 } from 'lucide-react';
 import { useAgentNames } from '@/components/hooks/useAgentNames';
+import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +38,14 @@ export default function Schedule() {
   const [selectedAgent, setSelectedAgent] = useState('mine'); // Default: minha agenda
   const [user, setUser] = useState(null);
   const { agentNamesArray: AGENTS } = useAgentNames();
+  const { getDisplayName, accessRecords } = useUserDisplayName();
+  
+  // Usar usuários aprovados como agentes
+  const approvedUsers = accessRecords.filter(r => 
+    r.roles?.includes('agente_comercial') || 
+    r.roles?.includes('gerente') || 
+    r.roles?.includes('administrador')
+  );
 
   useEffect(() => {
     const loadUser = async () => {
@@ -158,7 +167,7 @@ export default function Schedule() {
           </DropdownMenu>
         </div>
         {!compact && (
-          <p className="text-white/60 text-xs mt-2">Agendado por: {apt.scheduled_by || '-'}</p>
+          <p className="text-white/60 text-xs mt-2">Agente: {getDisplayName(apt.agent_email, apt.agent)}</p>
         )}
       </div>
     );

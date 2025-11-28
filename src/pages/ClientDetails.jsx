@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import InteractionForm from '@/components/crm/InteractionForm';
+import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
 
 export default function ClientDetails() {
   const navigate = useNavigate();
@@ -23,6 +24,7 @@ export default function ClientDetails() {
   const clientId = urlParams.get('id');
   const [showInteractionForm, setShowInteractionForm] = useState(false);
   const [user, setUser] = useState(null);
+  const { getDisplayName } = useUserDisplayName();
 
   useEffect(() => {
     const loadUser = async () => {
@@ -228,7 +230,7 @@ export default function ClientDetails() {
                               R$ {interaction.sale_value.toFixed(2)}
                             </Badge>
                           )}
-                          <p className="text-xs text-slate-400 mt-2">por {interaction.agent_name || 'Agente'}</p>
+                          <p className="text-xs text-slate-400 mt-2">por {getDisplayName(interaction.agent_email, interaction.agent_name)}</p>
                         </div>
                       </div>
                     );
