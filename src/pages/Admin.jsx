@@ -4,8 +4,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { 
   Settings, Users, Package, Target, Plus, Edit, Trash2, 
-  Shield, CheckCircle, XCircle, UserCog, Save
+  Shield, CheckCircle, XCircle, UserCog, Save, AtSign
 } from 'lucide-react';
+import NicknameEditor from '@/components/admin/NicknameEditor';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -143,8 +144,20 @@ export default function Admin() {
     mutationFn: ({ id, roles }) => base44.entities.UserAccess.update(id, { roles }),
     onSuccess: () => {
       queryClient.invalidateQueries(['access-requests']);
+      queryClient.invalidateQueries(['user-access-all']);
       setEditingUserRoles(null);
       setSelectedRoles([]);
+    },
+  });
+
+  const [savingNickname, setSavingNickname] = useState(null);
+
+  const updateNickname = useMutation({
+    mutationFn: ({ id, nickname }) => base44.entities.UserAccess.update(id, { nickname }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['access-requests']);
+      queryClient.invalidateQueries(['user-access-all']);
+      setSavingNickname(null);
     },
   });
 
@@ -417,23 +430,43 @@ export default function Admin() {
                       <div className="w-2 h-2 bg-green-500 rounded-full" />
                       Usuários Aprovados ({accessRequests.filter(r => r.status === 'approved').length})
                     </h3>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Usuário</TableHead>
-                          <TableHead>E-mail</TableHead>
-                          <TableHead>Funções</TableHead>
-                          <TableHead>Aprovado em</TableHead>
-                          <TableHead>Ações</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {accessRequests.filter(r => r.status === 'approved').map((request) => (
-                          <TableRow key={request.id}>
-                            <TableCell className="font-medium">{request.user_name || '-'}</TableCell>
-                            <TableCell>{request.user_email}</TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap gap-1">
+                    <div className="space-y-4">
+                      {accessRequests.filter(r => r.status === 'approved').map((request) => (
+                        <div key={request.id} className="p-4 bg-slate-50 rounded-xl border">
+                          <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                            {/* Info do usuário */}
+                            <div className="flex items-center gap-3 min-w-[200px]">
+                              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#6B2D8B] to-[#8B4DAB] flex items-center justify-center text-white font-bold">
+                                {request.user_name?.charAt(0) || 'U'}
+                              </div>
+                              <div>
+                                <p className="font-medium text-slate-800">{request.user_name || 'Usuário'}</p>
+                                <p className="text-xs text-slate-500">{request.user_email}</p>
+                                {request.nickname && (
+                                  <Badge variant="secondary" className="text-xs mt-1">
+                                    <AtSign className="w-3 h-3 mr-1" />
+                                    {request.nickname}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Nickname Editor */}
+                            <div className="flex-1 min-w-[250px]">
+                              <NicknameEditor
+                                userAccess={request}
+                                onSave={(id, nickname) => {
+                                  setSavingNickname(id);
+                                  updateNickname.mutate({ id, nickname });
+                                }}
+                                isSaving={savingNickname === request.id}
+                              />
+                            </div>
+
+                            {/* Funções */}
+                            <div className="min-w-[150px]">
+                              <Label className="text-xs text-slate-500">Funções</Label>
+                              <div className="flex flex-wrap gap-1 mt-1">
                                 {(request.roles || []).map(role => (
                                   <Badge key={role} variant="outline" className="text-xs">
                                     {AVAILABLE_ROLES.find(r => r.value === role)?.label || role}
@@ -443,36 +476,34 @@ export default function Admin() {
                                   <span className="text-slate-400 text-xs">Sem função</span>
                                 )}
                               </div>
-                            </TableCell>
-                            <TableCell>{request.approved_at ? format(new Date(request.approved_at), 'dd/MM/yyyy') : '-'}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Button
-                                  onClick={() => {
-                                    setEditingUserRoles(request);
-                                    setSelectedRoles(request.roles || []);
-                                  }}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-[#6B2D8B]"
-                                >
-                                  <Edit className="w-4 h-4 mr-1" />
-                                  Editar
-                                </Button>
-                                <Button
-                                  onClick={() => updateAccess.mutate({ id: request.id, status: 'rejected' })}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-red-600"
-                                >
-                                  Revogar
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                            </div>
+
+                            {/* Ações */}
+                            <div className="flex gap-2">
+                              <Button
+                                onClick={() => {
+                                  setEditingUserRoles(request);
+                                  setSelectedRoles(request.roles || []);
+                                }}
+                                variant="outline"
+                                size="sm"
+                              >
+                                <Edit className="w-4 h-4 mr-1" />
+                                Funções
+                              </Button>
+                              <Button
+                                onClick={() => updateAccess.mutate({ id: request.id, status: 'rejected' })}
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600"
+                              >
+                                Revogar
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   {/* Edit Roles Dialog */}
