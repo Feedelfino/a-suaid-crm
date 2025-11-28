@@ -162,6 +162,7 @@ export default function Layout({ children, currentPageName }) {
     { name: 'Dashboard', icon: BarChart3, page: 'Dashboard' },
     { name: 'Campanhas', icon: Target, page: 'Campaigns' },
     { name: 'Relatórios', icon: FileText, page: 'Reports' },
+    { name: 'Performance', icon: BarChart3, page: 'AgentPerformance' },
     { name: 'Renovações', icon: RefreshCw, page: 'Renewals' },
     { name: 'Banco de Dados', icon: Database, page: 'DataImport' },
     { name: 'Notas', icon: StickyNote, page: 'Notes' },
