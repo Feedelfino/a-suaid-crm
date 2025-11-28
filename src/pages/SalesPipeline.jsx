@@ -40,6 +40,29 @@ const FUNNEL_STAGES = [
 export default function SalesPipeline() {
   const queryClient = useQueryClient();
   const [showScores, setShowScores] = useState(true);
+  const [user, setUser] = useState(null);
+  const [userAccess, setUserAccess] = useState(null);
+
+  React.useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const userData = await base44.auth.me();
+        setUser(userData);
+        // Buscar funções do usuário
+        const accessRecords = await base44.entities.UserAccess.filter({ user_email: userData.email });
+        if (accessRecords.length > 0) {
+          setUserAccess(accessRecords[0]);
+        }
+      } catch (e) {}
+    };
+    loadUser();
+  }, []);
+
+  // Verificar se pode editar o funil
+  const canEditFunnel = user?.role === 'admin' || 
+    userAccess?.roles?.includes('administrador') ||
+    userAccess?.roles?.includes('gerente') ||
+    userAccess?.roles?.includes('agente_comercial');
 
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ['pipeline-clients'],
@@ -63,6 +86,7 @@ export default function SalesPipeline() {
 
   const handleDragEnd = (result) => {
     if (!result.destination) return;
+    if (!canEditFunnel) return; // Bloquear se não tiver permissão
     
     const clientId = result.draggableId;
     const newStage = result.destination.droppableId;
@@ -113,7 +137,11 @@ export default function SalesPipeline() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Funil de Vendas</h1>
-          <p className="text-slate-500">Arraste os clientes entre as etapas</p>
+          <p className="text-slate-500">
+            {canEditFunnel 
+              ? 'Arraste os clientes entre as etapas' 
+              : 'Visualização do funil (sem permissão para editar)'}
+          </p>
         </div>
         <div className="flex gap-4 items-center">
           <Button
