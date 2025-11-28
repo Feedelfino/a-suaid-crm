@@ -9,6 +9,7 @@ import {
   Settings, Save
 } from 'lucide-react';
 import { useAgentNames } from '@/components/hooks/useAgentNames';
+import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,16 @@ export default function AgentPerformance() {
   const [targetDialogOpen, setTargetDialogOpen] = useState(false);
   const [targetForm, setTargetForm] = useState({ agent: '', sales_target: '', interaction_target: '', appointment_target: '' });
   const { agentNamesArray: AGENTS, agentNames } = useAgentNames();
+  const { accessRecords, getDisplayName } = useUserDisplayName();
+  
+  // Usar usuários aprovados como agentes
+  const approvedUsers = accessRecords.filter(r => 
+    r.roles?.includes('agente_comercial') || 
+    r.roles?.includes('gerente') || 
+    r.roles?.includes('administrador')
+  ).map(r => r.nickname || r.user_name);
+  
+  const AGENT_LIST = approvedUsers.length > 0 ? approvedUsers : AGENTS;
 
   useEffect(() => {
     const loadUser = async () => {
@@ -148,7 +159,7 @@ export default function AgentPerformance() {
     };
   };
 
-  const agentMetrics = AGENTS.map(agent => calculateAgentMetrics(agent));
+  const agentMetrics = AGENT_LIST.map(agent => calculateAgentMetrics(agent));
 
   // Sort by sales value for ranking
   const rankedAgents = [...agentMetrics].sort((a, b) => b.totalSalesValue - a.totalSalesValue);
@@ -224,7 +235,7 @@ export default function AgentPerformance() {
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {AGENTS.map(agent => (
+                        {AGENT_LIST.map(agent => (
                           <SelectItem key={agent} value={agent}>{agent}</SelectItem>
                         ))}
                       </SelectContent>
@@ -318,7 +329,7 @@ export default function AgentPerformance() {
               <div>
                 <p className="text-slate-500">Taxa Conversão</p>
                 <p className="text-3xl font-bold text-slate-800">
-                  {(agentMetrics.reduce((s, a) => s + a.conversionRate, 0) / AGENTS.length).toFixed(1)}%
+                  {(agentMetrics.reduce((s, a) => s + a.conversionRate, 0) / (AGENT_LIST.length || 1)).toFixed(1)}%
                 </p>
               </div>
               <TrendingUp className="w-10 h-10 text-slate-200" />

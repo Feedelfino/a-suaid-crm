@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
+import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
 import { 
   Plus, StickyNote, Pin, Trash2, Edit, X, Check
 } from 'lucide-react';
