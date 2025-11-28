@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function Admin() {
   const queryClient = useQueryClient();
@@ -127,6 +128,29 @@ export default function Admin() {
   });
 
   const [savingAgent, setSavingAgent] = useState(null);
+  const [approvingUser, setApprovingUser] = useState(null);
+  const [selectedRoles, setSelectedRoles] = useState([]);
+
+  const AVAILABLE_ROLES = [
+    { value: 'administrador', label: 'Administrador', description: 'Acesso total ao sistema' },
+    { value: 'gerente', label: 'Gerente', description: 'Gerencia equipes e relatórios' },
+    { value: 'agente_registro', label: 'Agente de Registro', description: 'Emissão e renovação de certificados' },
+    { value: 'agente_comercial', label: 'Agente Comercial', description: 'Vendas e relacionamento com clientes' },
+  ];
+
+  const approveWithRoles = useMutation({
+    mutationFn: ({ id, roles }) => base44.entities.UserAccess.update(id, { 
+      status: 'approved',
+      roles,
+      approved_by: user?.email,
+      approved_at: new Date().toISOString(),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['access-requests']);
+      setApprovingUser(null);
+      setSelectedRoles([]);
+    },
+  });
 
   // Product Form
   const [productDialog, setProductDialog] = useState(false);
@@ -302,29 +326,88 @@ export default function Admin() {
                                 <p className="text-xs text-slate-400">Solicitado em: {request.created_date ? format(new Date(request.created_date), 'dd/MM/yyyy HH:mm') : '-'}</p>
                               </div>
                             </div>
-                            <div className="flex gap-2">
-                              <Button
-                                onClick={() => updateAccess.mutate({ id: request.id, status: 'approved' })}
-                                className="bg-green-600 hover:bg-green-700"
-                                size="sm"
-                              >
-                                <CheckCircle className="w-4 h-4 mr-1" />
-                                Aprovar
-                              </Button>
-                              <Button
-                                onClick={() => updateAccess.mutate({ id: request.id, status: 'rejected' })}
-                                variant="destructive"
-                                size="sm"
-                              >
-                                <XCircle className="w-4 h-4 mr-1" />
-                                Rejeitar
-                              </Button>
+                            <div className="flex flex-col gap-2">
+                              <div className="flex gap-2">
+                                <Button
+                                  onClick={() => setApprovingUser(request)}
+                                  className="bg-green-600 hover:bg-green-700"
+                                  size="sm"
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-1" />
+                                  Aprovar
+                                </Button>
+                                <Button
+                                  onClick={() => updateAccess.mutate({ id: request.id, status: 'rejected' })}
+                                  variant="destructive"
+                                  size="sm"
+                                >
+                                  <XCircle className="w-4 h-4 mr-1" />
+                                  Rejeitar
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
+
+                  {/* Role Assignment Dialog */}
+                  <Dialog open={!!approvingUser} onOpenChange={(open) => { if (!open) { setApprovingUser(null); setSelectedRoles([]); } }}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Definir Funções do Usuário</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="p-3 bg-slate-50 rounded-lg">
+                          <p className="font-medium">{approvingUser?.user_name}</p>
+                          <p className="text-sm text-slate-500">{approvingUser?.user_email}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium mb-3 block">Selecione pelo menos uma função:</Label>
+                          <div className="space-y-3">
+                            {AVAILABLE_ROLES.map(role => (
+                              <label
+                                key={role.value}
+                                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                                  selectedRoles.includes(role.value) 
+                                    ? 'bg-[#6B2D8B]/5 border-[#6B2D8B]' 
+                                    : 'bg-white border-slate-200 hover:bg-slate-50'
+                                }`}
+                              >
+                                <Checkbox
+                                  checked={selectedRoles.includes(role.value)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setSelectedRoles([...selectedRoles, role.value]);
+                                    } else {
+                                      setSelectedRoles(selectedRoles.filter(r => r !== role.value));
+                                    }
+                                  }}
+                                />
+                                <div>
+                                  <p className="font-medium text-slate-800">{role.label}</p>
+                                  <p className="text-xs text-slate-500">{role.description}</p>
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-3 pt-4">
+                          <Button variant="outline" onClick={() => { setApprovingUser(null); setSelectedRoles([]); }}>
+                            Cancelar
+                          </Button>
+                          <Button
+                            onClick={() => approveWithRoles.mutate({ id: approvingUser.id, roles: selectedRoles })}
+                            disabled={selectedRoles.length === 0}
+                            className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]"
+                          >
+                            Aprovar com Funções
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
 
                   {/* Approved Users */}
                   <div className="mb-8">
@@ -337,6 +420,7 @@ export default function Admin() {
                         <TableRow>
                           <TableHead>Usuário</TableHead>
                           <TableHead>E-mail</TableHead>
+                          <TableHead>Funções</TableHead>
                           <TableHead>Aprovado em</TableHead>
                           <TableHead>Ações</TableHead>
                         </TableRow>
@@ -346,6 +430,18 @@ export default function Admin() {
                           <TableRow key={request.id}>
                             <TableCell className="font-medium">{request.user_name || '-'}</TableCell>
                             <TableCell>{request.user_email}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {(request.roles || []).map(role => (
+                                  <Badge key={role} variant="outline" className="text-xs">
+                                    {AVAILABLE_ROLES.find(r => r.value === role)?.label || role}
+                                  </Badge>
+                                ))}
+                                {(!request.roles || request.roles.length === 0) && (
+                                  <span className="text-slate-400 text-xs">Sem função</span>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell>{request.approved_at ? format(new Date(request.approved_at), 'dd/MM/yyyy') : '-'}</TableCell>
                             <TableCell>
                               <Button
