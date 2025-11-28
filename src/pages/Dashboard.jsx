@@ -8,6 +8,7 @@ import {
   CheckCircle, XCircle, Clock, BarChart3, PieChart
 } from 'lucide-react';
 import { useAgentNames } from '@/components/hooks/useAgentNames';
+import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -31,6 +32,16 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [viewMode, setViewMode] = useState('company');
   const { agentList } = useAgentNames();
+  const { getDisplayName, accessRecords } = useUserDisplayName();
+  
+  // Usar usuários aprovados como agentes
+  const approvedUsers = accessRecords.filter(r => 
+    r.roles?.includes('agente_comercial') || 
+    r.roles?.includes('gerente') || 
+    r.roles?.includes('administrador')
+  ).map(r => ({ name: r.nickname || r.user_name, email: r.user_email }));
+  
+  const displayAgentList = approvedUsers.length > 0 ? approvedUsers : agentList;
 
   useEffect(() => {
     const loadUser = async () => {
@@ -129,7 +140,7 @@ export default function Dashboard() {
   ).map(([name, value]) => ({ name: name.replace('_', ' '), value }));
 
   // Agent stats
-  const agentStats = agentList.map(({ name: agent }) => {
+  const agentStats = displayAgentList.map(({ name: agent }) => {
     const agentInteractions = monthInteractions.filter(i => i.agent_name === agent);
     const agentAppointments = monthAppointments.filter(a => a.agent === agent);
     const agentSales = agentInteractions.filter(i => i.tabulation === 'venda_feita');
