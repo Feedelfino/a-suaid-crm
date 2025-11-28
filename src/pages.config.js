@@ -14,6 +14,9 @@ import Tasks from './pages/Tasks';
 import AccessPending from './pages/AccessPending';
 import AccessDenied from './pages/AccessDenied';
 import SalesPipeline from './pages/SalesPipeline';
+import Notes from './pages/Notes';
+import Chat from './pages/Chat';
+import Renewals from './pages/Renewals';
 import __Layout from './Layout.jsx';
 
 
@@ -34,6 +37,9 @@ export const PAGES = {
     "AccessPending": AccessPending,
     "AccessDenied": AccessDenied,
     "SalesPipeline": SalesPipeline,
+    "Notes": Notes,
+    "Chat": Chat,
+    "Renewals": Renewals,
 }
 
 export const pagesConfig = {

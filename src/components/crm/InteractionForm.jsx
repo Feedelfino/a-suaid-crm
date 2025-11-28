@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -12,7 +15,55 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export default function InteractionForm({ onSubmit, onCancel, isLoading }) {
+const PRODUCTS = [
+  { value: 'e_cpf_a1', label: 'e-CPF A1' },
+  { value: 'e_cpf_a3', label: 'e-CPF A3' },
+  { value: 'e_cnpj_a1', label: 'e-CNPJ A1' },
+  { value: 'e_cnpj_a3', label: 'e-CNPJ A3' },
+  { value: 'sites', label: 'Sites' },
+  { value: 'crm', label: 'CRM' },
+  { value: 'assinatura_digital', label: 'Assinatura Digital' },
+  { value: 'emissor_nf', label: 'Emissor de NF' },
+  { value: 'gestao_instagram', label: 'Gestão de Instagram' },
+  { value: 'gestao_linkedin', label: 'Gestão de LinkedIn' },
+  { value: 'outro', label: 'Outro' },
+];
+
+// Gera número de protocolo único
+const generateProtocolNumber = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  return `ATD${year}${month}${day}${random}`;
+};
+
+// Mapeia interação para etapa do funil
+const getFunnelStageFromInteraction = (interactionType, tabulation) => {
+  if (tabulation === 'venda_feita' || interactionType === 'venda_fechada') {
+    return 'fechamento';
+  }
+  if (interactionType === 'proposta_feita' || tabulation === 'proposta_enviada') {
+    return 'proposta';
+  }
+  if (interactionType === 'cliente_indeciso' || tabulation === 'indeciso_agendado') {
+    return 'negociacao';
+  }
+  if (interactionType === 'contato_sucesso' || interactionType === 'followup_agendado') {
+    return 'qualificacao';
+  }
+  if (interactionType === 'sem_interesse' || tabulation === 'sem_interesse') {
+    return 'perdido';
+  }
+  if (interactionType.startsWith('tentativa_')) {
+    return 'contato';
+  }
+  return null;
+};
+
+export default function InteractionForm({ onSubmit, onCancel, isLoading, clientId, clientName }) {
+  const [user, setUser] = useState(null);
   const [formData, setFormData] = useState({
     interaction_type: '',
     contact_method: '',
@@ -25,21 +76,97 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading }) {
     followup_method: '',
     partnership_type: '',
     notes: '',
+    no_interest_reason: '',
+    products_client_has: [],
   });
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const userData = await base44.auth.me();
+        setUser(userData);
+      } catch (e) {}
+    };
+    loadUser();
+  }, []);
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const toggleProductClientHas = (product) => {
+    setFormData(prev => ({
+      ...prev,
+      products_client_has: prev.products_client_has.includes(product)
+        ? prev.products_client_has.filter(p => p !== product)
+        : [...prev.products_client_has, product]
+    }));
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    const protocolNumber = generateProtocolNumber();
+    
     const data = {
       ...formData,
+      protocol_number: protocolNumber,
       sale_value: formData.sale_value ? parseFloat(formData.sale_value) : null,
       discount_percent: formData.discount_percent ? parseFloat(formData.discount_percent) : null,
+      agent_email: user?.email,
     };
+
+    // Se tem follow-up agendado, criar agendamento automaticamente
+    if ((formData.interaction_type === 'followup_agendado' || formData.tabulation === 'indeciso_agendado') && formData.followup_date) {
+      try {
+        const followupDate = new Date(formData.followup_date);
+        await base44.entities.Appointment.create({
+          client_id: clientId,
+          client_name: clientName,
+          agent: user?.full_name,
+          appointment_type: formData.followup_method === 'telefone' ? 'telefone' : 
+                           formData.followup_method === 'whatsapp' ? 'telefone' : 'videoconferencia',
+          date: formData.followup_date.split('T')[0],
+          time: followupDate.toTimeString().slice(0, 5),
+          duration: 30,
+          meeting_reason: 'followup',
+          status: 'aguardando',
+          scheduled_by: user?.full_name,
+        });
+
+        // Criar tarefa de follow-up
+        await base44.entities.Task.create({
+          title: `Follow-up: ${clientName}`,
+          task_type: 'followup',
+          client_id: clientId,
+          client_name: clientName,
+          agent: user?.full_name,
+          due_date: formData.followup_date,
+          status: 'pendente',
+        });
+      } catch (err) {
+        console.error('Erro ao criar agendamento:', err);
+      }
+    }
+
+    // Atualizar funil do cliente automaticamente
+    const newFunnelStage = getFunnelStageFromInteraction(formData.interaction_type, formData.tabulation);
+    if (newFunnelStage && clientId) {
+      try {
+        await base44.entities.Client.update(clientId, {
+          funnel_stage: newFunnelStage,
+          funnel_updated_at: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.error('Erro ao atualizar funil:', err);
+      }
+    }
+
     onSubmit(data);
   };
+
+  const showNoInterestReason = formData.interaction_type === 'sem_interesse' || formData.tabulation === 'sem_interesse';
+  const showProductsClientHas = formData.no_interest_reason === 'ja_possui_produto';
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -61,6 +188,7 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading }) {
               <SelectItem value="contato_sucesso">Contato com sucesso</SelectItem>
               <SelectItem value="followup_agendado">Follow-up agendado</SelectItem>
               <SelectItem value="cliente_indeciso">Cliente indeciso</SelectItem>
+              <SelectItem value="proposta_feita">Proposta feita</SelectItem>
               <SelectItem value="venda_fechada">Venda fechada</SelectItem>
               <SelectItem value="parceria">Parceria</SelectItem>
               <SelectItem value="sem_interesse">Sem interesse</SelectItem>
@@ -96,17 +224,9 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading }) {
               <SelectValue placeholder="Selecione..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="e_cpf_a1">e-CPF A1</SelectItem>
-              <SelectItem value="e_cpf_a3">e-CPF A3</SelectItem>
-              <SelectItem value="e_cnpj_a1">e-CNPJ A1</SelectItem>
-              <SelectItem value="e_cnpj_a3">e-CNPJ A3</SelectItem>
-              <SelectItem value="sites">Sites</SelectItem>
-              <SelectItem value="crm">CRM</SelectItem>
-              <SelectItem value="assinatura_digital">Assinatura Digital</SelectItem>
-              <SelectItem value="emissor_nf">Emissor de NF</SelectItem>
-              <SelectItem value="gestao_instagram">Gestão de Instagram</SelectItem>
-              <SelectItem value="gestao_linkedin">Gestão de LinkedIn</SelectItem>
-              <SelectItem value="outro">Outro</SelectItem>
+              {PRODUCTS.map(p => (
+                <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -126,6 +246,7 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading }) {
               <SelectItem value="indeciso_agendado">Indeciso (com agendamento)</SelectItem>
               <SelectItem value="sem_interesse">Sem interesse</SelectItem>
               <SelectItem value="retornar_90_dias">Retornar em 90 dias</SelectItem>
+              <SelectItem value="proposta_enviada">Proposta enviada</SelectItem>
               <SelectItem value="venda_feita">Venda feita</SelectItem>
               <SelectItem value="parceria_firmada">Parceria firmada</SelectItem>
             </SelectContent>
@@ -133,6 +254,52 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading }) {
         </div>
       </div>
 
+      {/* Seção de Sem Interesse - Motivo */}
+      {showNoInterestReason && (
+        <div className="p-4 bg-red-50 rounded-xl border border-red-100 space-y-4">
+          <Label className="text-red-700 font-medium">Motivo de sem interesse</Label>
+          <Select 
+            value={formData.no_interest_reason} 
+            onValueChange={(v) => handleChange('no_interest_reason', v)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione o motivo..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="financeiro">Financeiro</SelectItem>
+              <SelectItem value="preco_concorrencia">Melhor preço da concorrência</SelectItem>
+              <SelectItem value="ja_possui_produto">Já possui este produto</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Se já possui produto, mostrar lista de produtos */}
+          {showProductsClientHas && (
+            <div className="space-y-3 pt-2">
+              <Label className="text-red-700">Quais produtos o cliente já possui?</Label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {PRODUCTS.map(product => (
+                  <label 
+                    key={product.value}
+                    className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
+                      formData.products_client_has.includes(product.value) 
+                        ? 'bg-red-100 border-red-300' 
+                        : 'bg-white border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Checkbox 
+                      checked={formData.products_client_has.includes(product.value)}
+                      onCheckedChange={() => toggleProductClientHas(product.value)}
+                    />
+                    <span className="text-sm">{product.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Seção de Venda */}
       {(formData.interaction_type === 'venda_fechada' || formData.tabulation === 'venda_feita') && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-emerald-50 rounded-xl">
           <div className="space-y-2">
@@ -168,6 +335,7 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading }) {
         </div>
       )}
 
+      {/* Seção de Follow-up */}
       {(formData.interaction_type === 'followup_agendado' || formData.tabulation === 'indeciso_agendado') && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-amber-50 rounded-xl">
           <div className="space-y-2">
@@ -177,6 +345,7 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading }) {
               value={formData.followup_date}
               onChange={(e) => handleChange('followup_date', e.target.value)}
             />
+            <p className="text-xs text-amber-600">* Será criado agendamento automático na agenda</p>
           </div>
           <div className="space-y-2">
             <Label>Meio do Follow-up</Label>
@@ -194,6 +363,15 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading }) {
               </SelectContent>
             </Select>
           </div>
+        </div>
+      )}
+
+      {/* Seção de Proposta */}
+      {(formData.interaction_type === 'proposta_feita' || formData.tabulation === 'proposta_enviada') && (
+        <div className="p-4 bg-blue-50 rounded-xl">
+          <p className="text-sm text-blue-700">
+            ✓ O cliente será movido para a etapa "Proposta" no funil de vendas
+          </p>
         </div>
       )}
 
