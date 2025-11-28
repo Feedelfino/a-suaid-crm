@@ -112,13 +112,13 @@ export default function Home() {
               </Button>
             </Link>
             <Link to={createPageUrl('Schedule')}>
-              <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
+              <Button className="bg-amber-400 text-slate-900 hover:bg-amber-500 shadow-lg font-semibold">
                 <Calendar className="w-4 h-4 mr-2" />
                 Ver Agenda
               </Button>
             </Link>
             <Link to={createPageUrl('SalesPipeline')}>
-              <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
+              <Button className="bg-emerald-400 text-slate-900 hover:bg-emerald-500 shadow-lg font-semibold">
                 <GitBranch className="w-4 h-4 mr-2" />
                 Funil de Vendas
               </Button>
@@ -127,66 +127,74 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Clicáveis */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500 mb-1">Tarefas Hoje</p>
-                <p className="text-3xl font-bold text-slate-800">{todayTasks.length}</p>
+        <Link to={createPageUrl('Tasks')}>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 hover:shadow-xl transition-all cursor-pointer hover:scale-[1.02]">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500 mb-1">Tarefas Hoje</p>
+                  <p className="text-3xl font-bold text-slate-800">{todayTasks.length}</p>
+                </div>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#6B2D8B] to-[#8B4DAB] flex items-center justify-center shadow-lg">
+                  <CheckCircle2 className="w-7 h-7 text-white" />
+                </div>
               </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#6B2D8B] to-[#8B4DAB] flex items-center justify-center shadow-lg">
-                <CheckCircle2 className="w-7 h-7 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500 mb-1">Reuniões Hoje</p>
-                <p className="text-3xl font-bold text-slate-800">{appointments.length}</p>
+        <Link to={createPageUrl('Schedule')}>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 hover:shadow-xl transition-all cursor-pointer hover:scale-[1.02]">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500 mb-1">Reuniões Hoje</p>
+                  <p className="text-3xl font-bold text-slate-800">{appointments.length}</p>
+                </div>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#C71585] to-[#FF6B9D] flex items-center justify-center shadow-lg">
+                  <Calendar className="w-7 h-7 text-white" />
+                </div>
               </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#C71585] to-[#FF6B9D] flex items-center justify-center shadow-lg">
-                <Calendar className="w-7 h-7 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500 mb-1">Meta do Mês</p>
-                <p className="text-3xl font-bold text-slate-800">
-                  {goalProgress.toFixed(0)}%
-                </p>
+        <Link to={createPageUrl('Dashboard')}>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 hover:shadow-xl transition-all cursor-pointer hover:scale-[1.02]">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500 mb-1">Meta do Mês</p>
+                  <p className="text-3xl font-bold text-slate-800">
+                    {goalProgress.toFixed(0)}%
+                  </p>
+                </div>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
+                  <Target className="w-7 h-7 text-white" />
+                </div>
               </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
-                <Target className="w-7 h-7 text-white" />
-              </div>
-            </div>
-            <Progress value={goalProgress} className="mt-3 h-2" />
-          </CardContent>
-        </Card>
+              <Progress value={goalProgress} className="mt-3 h-2" />
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500 mb-1">Pendentes</p>
-                <p className="text-3xl font-bold text-slate-800">{tasks.length}</p>
+        <Link to={createPageUrl('Tasks')}>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 hover:shadow-xl transition-all cursor-pointer hover:scale-[1.02]">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-500 mb-1">Pendentes</p>
+                  <p className="text-3xl font-bold text-slate-800">{tasks.length}</p>
+                </div>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-lg">
+                  <Zap className="w-7 h-7 text-white" />
+                </div>
               </div>
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center shadow-lg">
-                <Zap className="w-7 h-7 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
