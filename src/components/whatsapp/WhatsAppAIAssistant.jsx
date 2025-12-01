@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { 
   Sparkles, RefreshCw, Copy, MessageSquare, 
-  CheckCircle, Loader2, Zap
+  CheckCircle, Loader2, Zap, BookOpen
 } from 'lucide-react';
 import {
   Select,
@@ -37,7 +39,6 @@ const TONES = [
 export default function WhatsAppAIAssistant({ 
   client, 
   interactions = [], 
-  product,
   campaign,
   onSelectMessage 
 }) {
@@ -45,7 +46,17 @@ export default function WhatsAppAIAssistant({
   const [suggestions, setSuggestions] = useState([]);
   const [selectedContext, setSelectedContext] = useState('primeiro_contato');
   const [selectedTone, setSelectedTone] = useState('profissional');
+  const [selectedProduct, setSelectedProduct] = useState('');
+  const [useStorytelling, setUseStorytelling] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
+
+  // Buscar produtos disponíveis
+  const { data: products = [] } = useQuery({
+    queryKey: ['products-active'],
+    queryFn: () => base44.entities.Product.filter({ active: true }),
+  });
+
+  const selectedProductData = products.find(p => p.id === selectedProduct);
 
   const generateSuggestions = async () => {
     setIsGenerating(true);
@@ -61,36 +72,58 @@ export default function WhatsAppAIAssistant({
         Área de atuação: ${client?.business_area || 'Não informada'}
       `;
 
+      // Contexto do produto selecionado
+      const productContext = selectedProductData ? `
+        PRODUTO SELECIONADO:
+        - Nome: ${selectedProductData.name}
+        - Categoria: ${selectedProductData.category}
+        - Preço: R$ ${selectedProductData.price?.toLocaleString('pt-BR') || 'Sob consulta'}
+        - Código: ${selectedProductData.code || 'N/A'}
+      ` : 'Produto: Certificado Digital / Soluções Empresariais (genérico)';
+
       // Histórico de interações
       const interactionHistory = interactions.slice(0, 5).map(i => 
         `- ${i.interaction_type}: ${i.notes || 'Sem observações'} (${i.tabulation || 'sem tabulação'})`
       ).join('\n');
+
+      const storytellingInstruction = useStorytelling ? `
+IMPORTANTE - USE STORYTELLING:
+- Comece com uma história envolvente ou caso de sucesso
+- Crie conexão emocional antes de apresentar a solução
+- Use narrativas que prendam a atenção nos primeiros segundos
+- Conte histórias de transformação de clientes similares
+- Use "Imagine...", "Era uma vez um empresário como você...", "Um cliente nosso estava na mesma situação..."
+` : '';
 
       const prompt = `Você é um especialista em vendas e copywriting persuasivo para WhatsApp.
 
 CONTEXTO DO CLIENTE:
 ${clientContext}
 
+${productContext}
+
 HISTÓRICO DE INTERAÇÕES:
 ${interactionHistory || 'Primeiro contato com este cliente'}
 
-PRODUTO/SERVIÇO: ${product || 'Certificado Digital / Soluções Empresariais'}
 CAMPANHA: ${campaign?.name || 'Prospecção Geral'}
 
 OBJETIVO DA MENSAGEM: ${MESSAGE_CONTEXTS.find(c => c.value === selectedContext)?.description}
 TOM DESEJADO: ${selectedTone}
+${storytellingInstruction}
 
 Gere 3 sugestões de mensagens para WhatsApp usando técnicas de:
 - SPIN Selling (Situação, Problema, Implicação, Necessidade)
 - AIDA (Atenção, Interesse, Desejo, Ação)
 - Gatilhos mentais (escassez, urgência, prova social, autoridade)
 - PNL (rapport, linguagem hipnótica leve)
+${useStorytelling ? '- STORYTELLING (narrativas envolventes que capturam atenção)' : ''}
 
 As mensagens devem ser:
-- Diretas e objetivas (máximo 300 caracteres cada)
-- Personalizadas para o contexto
-- Com call-to-action claro
+- IMPACTANTES e que CHAMEM ATENÇÃO logo no início
+- Personalizadas para o contexto e produto específico
+- Com call-to-action claro e irresistível
 - Profissionais mas humanizadas
+- Máximo 350 caracteres cada
 
 Retorne em JSON com formato:
 {
@@ -176,36 +209,71 @@ Retorne em JSON com formato:
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Configurações */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-600 mb-1 block">Contexto</label>
+              <Select value={selectedContext} onValueChange={setSelectedContext}>
+                <SelectTrigger className="bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MESSAGE_CONTEXTS.map(ctx => (
+                    <SelectItem key={ctx.value} value={ctx.value}>
+                      {ctx.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-600 mb-1 block">Tom</label>
+              <Select value={selectedTone} onValueChange={setSelectedTone}>
+                <SelectTrigger className="bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TONES.map(tone => (
+                    <SelectItem key={tone.value} value={tone.value}>
+                      {tone.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Seleção de Produto */}
           <div>
-            <label className="text-xs text-slate-600 mb-1 block">Contexto</label>
-            <Select value={selectedContext} onValueChange={setSelectedContext}>
+            <label className="text-xs text-slate-600 mb-1 block">Produto (para contextualizar)</label>
+            <Select value={selectedProduct} onValueChange={setSelectedProduct}>
               <SelectTrigger className="bg-white">
-                <SelectValue />
+                <SelectValue placeholder="Selecione um produto..." />
               </SelectTrigger>
               <SelectContent>
-                {MESSAGE_CONTEXTS.map(ctx => (
-                  <SelectItem key={ctx.value} value={ctx.value}>
-                    {ctx.label}
+                <SelectItem value={null}>Nenhum (genérico)</SelectItem>
+                {products.map(product => (
+                  <SelectItem key={product.id} value={product.id}>
+                    {product.name} {product.price ? `- R$ ${product.price.toLocaleString('pt-BR')}` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <label className="text-xs text-slate-600 mb-1 block">Tom</label>
-            <Select value={selectedTone} onValueChange={setSelectedTone}>
-              <SelectTrigger className="bg-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TONES.map(tone => (
-                  <SelectItem key={tone.value} value={tone.value}>
-                    {tone.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+          {/* Toggle Storytelling */}
+          <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-emerald-600" />
+              <div>
+                <Label className="text-sm font-medium">Usar Storytelling</Label>
+                <p className="text-xs text-slate-500">Narrativas envolventes que capturam atenção</p>
+              </div>
+            </div>
+            <Switch
+              checked={useStorytelling}
+              onCheckedChange={setUseStorytelling}
+            />
           </div>
         </div>
 

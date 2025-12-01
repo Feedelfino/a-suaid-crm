@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import InteractionForm from '@/components/crm/InteractionForm';
 import WhatsAppAIAssistant from '@/components/whatsapp/WhatsAppAIAssistant';
+import EmailAIAssistant from '@/components/email/EmailAIAssistant';
 import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
 
 export default function ClientDetails() {
@@ -316,18 +317,46 @@ export default function ClientDetails() {
 
               {/* WhatsApp AI Assistant */}
               <WhatsAppAIAssistant
-              client={client}
-              interactions={interactions}
-              product={null}
-              campaign={null}
-              onSelectMessage={(message) => {
-              // Abrir WhatsApp com a mensagem
-              const phone = client.whatsapp || client.phone;
-              if (phone) {
-                const cleanPhone = phone.replace(/\D/g, '');
-                window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
-              }
-              }}
+                client={client}
+                interactions={interactions}
+                campaign={null}
+                onSelectMessage={(message) => {
+                  // Abrir WhatsApp com a mensagem
+                  const phone = client.whatsapp || client.phone;
+                  if (phone) {
+                    const cleanPhone = phone.replace(/\D/g, '');
+                    window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+                  }
+                }}
+              />
+
+              {/* Email AI Assistant */}
+              <EmailAIAssistant
+                client={client}
+                interactions={interactions}
+                campaign={null}
+                onSendEmail={async ({ to, subject, body }) => {
+                  try {
+                    await base44.integrations.Core.SendEmail({
+                      to,
+                      subject,
+                      body
+                    });
+                    // Registrar interação de email
+                    await base44.entities.Interaction.create({
+                      client_id: client.id,
+                      client_name: client.client_name,
+                      interaction_type: 'tentativa_email',
+                      contact_method: 'email',
+                      notes: `Assunto: ${subject}`,
+                      agent_name: user?.full_name,
+                      agent_email: user?.email,
+                    });
+                    queryClient.invalidateQueries(['interactions', clientId]);
+                  } catch (error) {
+                    console.error('Erro ao enviar email:', error);
+                  }
+                }}
               />
 
           {/* Appointments */}
