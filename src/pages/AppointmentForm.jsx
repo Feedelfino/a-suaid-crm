@@ -3,13 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Save, Calendar, User, Video, Phone, MapPin } from 'lucide-react';
-import { useAgentNames } from '@/components/hooks/useAgentNames';
+import { ArrowLeft, Save, Calendar, User, Video, Phone, MapPin, Building2, Users, Briefcase, Link2 } from 'lucide-react';
+import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -18,41 +20,95 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const EVENT_TYPES_COMERCIAL = [
+  { value: 'reuniao_venda', label: 'Reunião de Venda' },
+  { value: 'visita_comercial', label: 'Visita Comercial' },
+  { value: 'demonstracao', label: 'Demonstração de Produto' },
+  { value: 'followup', label: 'Follow-up' },
+  { value: 'tentativa_contato', label: 'Tentativa de Contato' },
+  { value: 'proposta', label: 'Prazo de Proposta' },
+];
+
+const EVENT_TYPES_INTERNO = [
+  { value: 'reuniao_equipe', label: 'Reunião de Equipe' },
+  { value: 'reuniao_administrativa', label: 'Reunião Administrativa' },
+  { value: 'reuniao_planejamento', label: 'Reunião de Planejamento' },
+  { value: 'reuniao_alinhamento', label: 'Reunião de Alinhamento' },
+  { value: 'sessao_feedback', label: 'Sessão de Feedback' },
+  { value: 'reuniao_1_1', label: 'Reunião 1:1' },
+  { value: 'treinamento', label: 'Treinamento Interno' },
+  { value: 'atividade_interna', label: 'Atividade Interna' },
+];
+
+const INTERNAL_AREAS = [
+  { value: 'comercial', label: 'Comercial' },
+  { value: 'administrativo', label: 'Administrativo' },
+  { value: 'operacional', label: 'Operacional' },
+  { value: 'juridico', label: 'Jurídico' },
+  { value: 'financeiro', label: 'Financeiro' },
+  { value: 'rh', label: 'Recursos Humanos' },
+  { value: 'ti', label: 'TI' },
+];
+
 export default function AppointmentForm() {
-  const { agentList } = useAgentNames();
   const navigate = useNavigate();
   const urlParams = new URLSearchParams(window.location.search);
   const appointmentId = urlParams.get('id');
   const clientIdParam = urlParams.get('client_id');
+  const dateParam = urlParams.get('date');
+  const timeParam = urlParams.get('time');
   
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [user, setUser] = useState(null);
+  const { getDisplayName, accessRecords } = useUserDisplayName();
+
+  const approvedUsers = accessRecords.filter(r => r.status === 'approved');
 
   const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    category: 'comercial',
+    event_type: 'reuniao_venda',
+    client_id: clientIdParam || '',
     client_name: '',
     company_name: '',
     phone: '',
     email: '',
     agent: '',
+    agent_email: '',
+    participants: [],
     appointment_type: 'telefone',
-    date: '',
-    time: '',
+    date: dateParam || '',
+    time: timeParam || '',
     duration: 30,
     location: '',
     meeting_link: '',
     scheduled_by: '',
+    scheduled_by_email: '',
     lead_source: '',
     meeting_reason: '',
     product: '',
+    campaign_id: '',
+    funnel_stage: '',
+    internal_area: '',
     status: 'aguardando',
     notes: '',
-    client_id: clientIdParam || '',
   });
 
   const { data: clients = [] } = useQuery({
     queryKey: ['clients-list'],
-    queryFn: () => base44.entities.Client.list('-created_date', 100),
+    queryFn: () => base44.entities.Client.list('-created_date', 200),
+  });
+
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ['campaigns-active'],
+    queryFn: () => base44.entities.Campaign.filter({ status: 'ativa' }),
+  });
+
+  const { data: products = [] } = useQuery({
+    queryKey: ['products-active'],
+    queryFn: () => base44.entities.Product.filter({ active: true }),
   });
 
   useEffect(() => {
@@ -60,7 +116,13 @@ export default function AppointmentForm() {
       try {
         const userData = await base44.auth.me();
         setUser(userData);
-        setFormData(prev => ({ ...prev, scheduled_by: userData.full_name }));
+        setFormData(prev => ({ 
+          ...prev, 
+          scheduled_by: userData.full_name,
+          scheduled_by_email: userData.email,
+          agent: getDisplayName(userData.email, userData.full_name),
+          agent_email: userData.email,
+        }));
       } catch (e) {}
     };
     loadUser();
@@ -83,6 +145,9 @@ export default function AppointmentForm() {
           phone: client.phone || '',
           email: client.email || '',
           client_id: client.id,
+          title: `Reunião - ${client.client_name}`,
+          funnel_stage: client.funnel_stage || 'lead',
+          campaign_id: client.campaign_id || '',
         }));
       }
     }
@@ -106,6 +171,17 @@ export default function AppointmentForm() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleAgentSelect = (email) => {
+    const agentUser = approvedUsers.find(u => u.user_email === email);
+    if (agentUser) {
+      setFormData(prev => ({
+        ...prev,
+        agent: agentUser.nickname || agentUser.user_name,
+        agent_email: email,
+      }));
+    }
+  };
+
   const handleClientSelect = (clientId) => {
     const client = clients.find(c => c.id === clientId);
     if (client) {
@@ -116,8 +192,20 @@ export default function AppointmentForm() {
         phone: client.phone || '',
         email: client.email || '',
         client_id: client.id,
+        title: prev.title || `Reunião - ${client.client_name}`,
+        funnel_stage: client.funnel_stage || prev.funnel_stage,
+        campaign_id: client.campaign_id || prev.campaign_id,
       }));
     }
+  };
+
+  const handleParticipantToggle = (email) => {
+    setFormData(prev => ({
+      ...prev,
+      participants: prev.participants?.includes(email)
+        ? prev.participants.filter(e => e !== email)
+        : [...(prev.participants || []), email]
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -125,22 +213,34 @@ export default function AppointmentForm() {
     setIsSaving(true);
     
     try {
+      // Gerar título automático se não preenchido
+      let finalData = { ...formData };
+      if (!finalData.title) {
+        if (finalData.category === 'comercial') {
+          finalData.title = `${finalData.client_name} - ${EVENT_TYPES_COMERCIAL.find(t => t.value === finalData.event_type)?.label || 'Reunião'}`;
+        } else {
+          finalData.title = EVENT_TYPES_INTERNO.find(t => t.value === finalData.event_type)?.label || 'Reunião Interna';
+        }
+      }
+
       if (appointmentId) {
-        await base44.entities.Appointment.update(appointmentId, formData);
+        await base44.entities.Appointment.update(appointmentId, finalData);
       } else {
-        const appointment = await base44.entities.Appointment.create(formData);
-        // Create task for this appointment
+        const appointment = await base44.entities.Appointment.create(finalData);
+        
+        // Criar tarefa vinculada
         await base44.entities.Task.create({
-          title: `${formData.appointment_type === 'presencial' ? 'Reunião presencial' : 
-                   formData.appointment_type === 'videoconferencia' ? 'Videochamada' : 'Ligação'} - ${formData.client_name}`,
-          task_type: formData.appointment_type === 'presencial' ? 'reuniao_presencial' : 
-                     formData.appointment_type === 'videoconferencia' ? 'videochamada' : 'ligacao',
-          client_id: formData.client_id,
-          client_name: formData.client_name,
-          agent: formData.agent,
-          due_date: `${formData.date}T${formData.time}`,
+          title: finalData.title,
+          task_type: finalData.appointment_type === 'presencial' ? 'reuniao_presencial' : 
+                     finalData.appointment_type === 'videoconferencia' ? 'videochamada' : 'ligacao',
+          client_id: finalData.client_id,
+          client_name: finalData.client_name,
+          agent: finalData.agent,
+          agent_email: finalData.agent_email,
+          due_date: `${finalData.date}T${finalData.time}`,
           appointment_id: appointment.id,
           status: 'pendente',
+          notes: finalData.description,
         });
       }
       navigate(createPageUrl('Schedule'));
@@ -159,6 +259,8 @@ export default function AppointmentForm() {
     );
   }
 
+  const isComercial = formData.category === 'comercial';
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
@@ -173,106 +275,258 @@ export default function AppointmentForm() {
         </Button>
         <div>
           <h1 className="text-2xl font-bold text-slate-800">
-            {appointmentId ? 'Editar Agendamento' : 'Novo Agendamento'}
+            {appointmentId ? 'Editar Compromisso' : 'Novo Compromisso'}
           </h1>
-          <p className="text-slate-500">Preencha os dados do agendamento</p>
+          <p className="text-slate-500">Preencha os dados do compromisso</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6">
-          {/* Client Info */}
+          {/* Tipo de Compromisso */}
           <Card className="border-0 shadow-lg">
             <CardHeader className="pb-4">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <User className="w-5 h-5 text-[#6B2D8B]" />
-                Cliente
-              </CardTitle>
+              <CardTitle className="text-lg">Tipo de Compromisso</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Selecionar Cliente Existente</Label>
-                <Select 
-                  value={formData.client_id} 
-                  onValueChange={handleClientSelect}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um cliente ou preencha manualmente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map(client => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.client_name} {client.company_name ? `- ${client.company_name}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <CardContent>
+              <Tabs value={formData.category} onValueChange={(v) => handleChange('category', v)}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="comercial" className="gap-2">
+                    <Briefcase className="w-4 h-4" />
+                    Comercial
+                  </TabsTrigger>
+                  <TabsTrigger value="interno" className="gap-2">
+                    <Building2 className="w-4 h-4" />
+                    Interno
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div className="space-y-2">
+                  <Label>Título *</Label>
+                  <Input
+                    value={formData.title}
+                    onChange={(e) => handleChange('title', e.target.value)}
+                    placeholder={isComercial ? "Ex: Apresentação comercial - Empresa X" : "Ex: Reunião de equipe semanal"}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tipo de Evento *</Label>
+                  <Select 
+                    value={formData.event_type} 
+                    onValueChange={(v) => handleChange('event_type', v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(isComercial ? EVENT_TYPES_COMERCIAL : EVENT_TYPES_INTERNO).map(type => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Nome do Cliente *</Label>
-                  <Input
-                    value={formData.client_name}
-                    onChange={(e) => handleChange('client_name', e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Empresa</Label>
-                  <Input
-                    value={formData.company_name}
-                    onChange={(e) => handleChange('company_name', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Telefone / WhatsApp</Label>
-                  <Input
-                    value={formData.phone}
-                    onChange={(e) => handleChange('phone', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>E-mail</Label>
-                  <Input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleChange('email', e.target.value)}
-                  />
-                </div>
+
+              <div className="mt-4 space-y-2">
+                <Label>Descrição</Label>
+                <Textarea
+                  value={formData.description}
+                  onChange={(e) => handleChange('description', e.target.value)}
+                  placeholder="Detalhes do compromisso..."
+                  rows={2}
+                />
               </div>
             </CardContent>
           </Card>
 
-          {/* Appointment Details */}
+          {/* Cliente (apenas para comercial) */}
+          {isComercial && (
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <User className="w-5 h-5 text-[#6B2D8B]" />
+                  Cliente / Lead
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Selecionar Cliente Existente</Label>
+                  <Select 
+                    value={formData.client_id} 
+                    onValueChange={handleClientSelect}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um cliente ou preencha manualmente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map(client => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.client_name} {client.company_name ? `- ${client.company_name}` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Nome do Cliente *</Label>
+                    <Input
+                      value={formData.client_name}
+                      onChange={(e) => handleChange('client_name', e.target.value)}
+                      required={isComercial}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Empresa</Label>
+                    <Input
+                      value={formData.company_name}
+                      onChange={(e) => handleChange('company_name', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Telefone / WhatsApp</Label>
+                    <Input
+                      value={formData.phone}
+                      onChange={(e) => handleChange('phone', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>E-mail</Label>
+                    <Input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => handleChange('email', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Campanha</Label>
+                    <Select 
+                      value={formData.campaign_id || ''} 
+                      onValueChange={(v) => handleChange('campaign_id', v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={null}>Nenhuma</SelectItem>
+                        {campaigns.map(c => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Etapa do Funil</Label>
+                    <Select 
+                      value={formData.funnel_stage || ''} 
+                      onValueChange={(v) => handleChange('funnel_stage', v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="lead">Lead</SelectItem>
+                        <SelectItem value="contato">Contato</SelectItem>
+                        <SelectItem value="qualificacao">Qualificação</SelectItem>
+                        <SelectItem value="proposta">Proposta</SelectItem>
+                        <SelectItem value="negociacao">Negociação</SelectItem>
+                        <SelectItem value="fechamento">Fechamento</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Produto</Label>
+                    <Select 
+                      value={formData.product || ''} 
+                      onValueChange={(v) => handleChange('product', v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={null}>Nenhum</SelectItem>
+                        {products.map(p => (
+                          <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Área Interna (apenas para interno) */}
+          {!isComercial && (
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-blue-600" />
+                  Detalhes Internos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label>Área Relacionada</Label>
+                  <Select 
+                    value={formData.internal_area || ''} 
+                    onValueChange={(v) => handleChange('internal_area', v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a área..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INTERNAL_AREAS.map(area => (
+                        <SelectItem key={area.value} value={area.value}>
+                          {area.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Data, Hora e Responsável */}
           <Card className="border-0 shadow-lg">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-[#6B2D8B]" />
-                Detalhes do Agendamento
+                Data e Responsável
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Agente Responsável *</Label>
+                <Label>Responsável *</Label>
                 <Select 
-                  value={formData.agent} 
-                  onValueChange={(v) => handleChange('agent', v)}
+                  value={formData.agent_email} 
+                  onValueChange={handleAgentSelect}
                   required
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {agentList.map(agent => (
-                      <SelectItem key={agent.key} value={agent.name}>{agent.name}</SelectItem>
+                    {approvedUsers.map(u => (
+                      <SelectItem key={u.user_email} value={u.user_email}>
+                        {u.nickname || u.user_name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label>Tipo de Reunião *</Label>
+                <Label>Canal *</Label>
                 <Select 
                   value={formData.appointment_type} 
                   onValueChange={(v) => handleChange('appointment_type', v)}
@@ -321,7 +575,7 @@ export default function AppointmentForm() {
               </div>
 
               <div className="space-y-2">
-                <Label>Duração (minutos)</Label>
+                <Label>Duração</Label>
                 <Select 
                   value={formData.duration?.toString()} 
                   onValueChange={(v) => handleChange('duration', parseInt(v))}
@@ -350,7 +604,7 @@ export default function AppointmentForm() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="aguardando">Aguardando confirmação</SelectItem>
+                    <SelectItem value="aguardando">Aguardando</SelectItem>
                     <SelectItem value="confirmada">Confirmada</SelectItem>
                     <SelectItem value="reagendada">Reagendada</SelectItem>
                     <SelectItem value="cancelada">Cancelada</SelectItem>
@@ -373,87 +627,66 @@ export default function AppointmentForm() {
 
               {formData.appointment_type === 'videoconferencia' && (
                 <div className="space-y-2 md:col-span-2">
-                  <Label>Link da Videochamada</Label>
+                  <Label className="flex items-center gap-2">
+                    <Link2 className="w-4 h-4" />
+                    Link da Videochamada
+                  </Label>
                   <Input
                     value={formData.meeting_link}
                     onChange={(e) => handleChange('meeting_link', e.target.value)}
                     placeholder="https://meet.google.com/..."
                   />
+                  <p className="text-xs text-slate-500">
+                    Cole o link do Google Meet, Zoom ou outra plataforma
+                  </p>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Additional Info */}
+          {/* Participantes */}
           <Card className="border-0 shadow-lg">
             <CardHeader className="pb-4">
-              <CardTitle className="text-lg">Informações Adicionais</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Users className="w-5 h-5 text-[#6B2D8B]" />
+                Participantes
+              </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Origem do Lead</Label>
-                <Select 
-                  value={formData.lead_source || ''} 
-                  onValueChange={(v) => handleChange('lead_source', v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                    <SelectItem value="indicacao">Indicação</SelectItem>
-                    <SelectItem value="instagram">Instagram</SelectItem>
-                    <SelectItem value="google_ads">Google Ads</SelectItem>
-                    <SelectItem value="organico">Orgânico</SelectItem>
-                    <SelectItem value="outro">Outro</SelectItem>
-                  </SelectContent>
-                </Select>
+            <CardContent>
+              <p className="text-sm text-slate-500 mb-3">
+                Selecione outros participantes além do responsável:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {approvedUsers.filter(u => u.user_email !== formData.agent_email).map(u => (
+                  <Badge
+                    key={u.user_email}
+                    variant={formData.participants?.includes(u.user_email) ? "default" : "outline"}
+                    className={`cursor-pointer transition-all ${
+                      formData.participants?.includes(u.user_email) 
+                        ? 'bg-[#6B2D8B] hover:bg-[#5a2575]' 
+                        : 'hover:bg-slate-100'
+                    }`}
+                    onClick={() => handleParticipantToggle(u.user_email)}
+                  >
+                    {u.nickname || u.user_name}
+                  </Badge>
+                ))}
               </div>
+            </CardContent>
+          </Card>
 
-              <div className="space-y-2">
-                <Label>Motivo da Reunião</Label>
-                <Select 
-                  value={formData.meeting_reason || ''} 
-                  onValueChange={(v) => handleChange('meeting_reason', v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="apresentacao_comercial">Apresentação Comercial</SelectItem>
-                    <SelectItem value="fechamento">Fechamento</SelectItem>
-                    <SelectItem value="diagnostico">Diagnóstico</SelectItem>
-                    <SelectItem value="followup">Follow-up</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Produto Relacionado</Label>
-                <Input
-                  value={formData.product}
-                  onChange={(e) => handleChange('product', e.target.value)}
-                  placeholder="Ex: Certificado A3, Site..."
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Quem Agendou</Label>
-                <Input
-                  value={formData.scheduled_by}
-                  onChange={(e) => handleChange('scheduled_by', e.target.value)}
-                  placeholder="Nome do colaborador"
-                />
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <Label>Observações</Label>
-                <Textarea
-                  value={formData.notes}
-                  onChange={(e) => handleChange('notes', e.target.value)}
-                  rows={3}
-                />
-              </div>
+          {/* Observações */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg">Observações</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                value={formData.notes}
+                onChange={(e) => handleChange('notes', e.target.value)}
+                rows={3}
+                placeholder="Informações adicionais sobre o compromisso..."
+              />
             </CardContent>
           </Card>
 
@@ -479,7 +712,7 @@ export default function AppointmentForm() {
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  Salvar Agendamento
+                  Salvar Compromisso
                 </>
               )}
             </Button>
