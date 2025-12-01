@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import InteractionForm from '@/components/crm/InteractionForm';
+import WhatsAppAIAssistant from '@/components/whatsapp/WhatsAppAIAssistant';
 import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
 
 export default function ClientDetails() {
@@ -310,8 +311,24 @@ export default function ClientDetails() {
                   <p className="text-slate-600 text-sm">{client.notes}</p>
                 </div>
               )}
-            </CardContent>
-          </Card>
+              </CardContent>
+              </Card>
+
+              {/* WhatsApp AI Assistant */}
+              <WhatsAppAIAssistant
+              client={client}
+              interactions={interactions}
+              product={null}
+              campaign={null}
+              onSelectMessage={(message) => {
+              // Abrir WhatsApp com a mensagem
+              const phone = client.whatsapp || client.phone;
+              if (phone) {
+                const cleanPhone = phone.replace(/\D/g, '');
+                window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+              }
+              }}
+              />
 
           {/* Appointments */}
           <Card className="border-0 shadow-lg">

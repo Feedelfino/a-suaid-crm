@@ -3,28 +3,29 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { base44 } from '@/api/base44Client';
 import { 
-  Home, 
-  Phone, 
-  Users, 
-  BarChart3, 
-  Target, 
-  FileText, 
-  Database, 
-  Settings, 
-  Calendar,
-  Menu,
-  X,
-  Linkedin,
-  Instagram,
-  Globe,
-  LogOut,
-  ChevronDown,
-  Lock,
-  GitBranch,
-  StickyNote,
-  MessageSquare,
-  RefreshCw
-} from 'lucide-react';
+        Home, 
+        Phone, 
+        Users, 
+        BarChart3, 
+        Target, 
+        FileText, 
+        Database, 
+        Settings, 
+        Calendar,
+        Menu,
+        X,
+        Linkedin,
+        Instagram,
+        Globe,
+        LogOut,
+        ChevronDown,
+        Lock,
+        GitBranch,
+        StickyNote,
+        MessageSquare,
+        RefreshCw,
+        BookOpen
+      } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -166,9 +167,10 @@ export default function Layout({ children, currentPageName }) {
     { name: 'Banco de Dados', icon: Database, page: 'DataImport' },
     { name: 'Notas', icon: StickyNote, page: 'Notes' },
     { name: 'Chat', icon: MessageSquare, page: 'Chat' },
-    // Admin menu only visible to admins
-    ...(isAdmin ? [{ name: 'Administração', icon: Settings, page: 'Admin' }] : []),
-  ];
+        { name: 'Central de Ajuda', icon: BookOpen, page: 'HelpCenter' },
+        // Admin menu only visible to admins
+        ...(isAdmin ? [{ name: 'Administração', icon: Settings, page: 'Admin' }] : []),
+      ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">

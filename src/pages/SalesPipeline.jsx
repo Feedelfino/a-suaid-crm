@@ -7,7 +7,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { format, parseISO } from 'date-fns';
 import { 
   Users, Phone, Mail, Building2, ArrowRight, 
-  MoreVertical, Eye, DollarSign, TrendingUp, Sparkles, Zap
+  MoreVertical, Eye, DollarSign, TrendingUp, Sparkles, Zap, Filter
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,7 @@ export default function SalesPipeline() {
   const [showScores, setShowScores] = useState(true);
   const [user, setUser] = useState(null);
   const [userAccess, setUserAccess] = useState(null);
+  const [selectedCampaigns, setSelectedCampaigns] = useState([]);
 
   React.useEffect(() => {
     const loadUser = async () => {
@@ -79,6 +80,11 @@ export default function SalesPipeline() {
     queryFn: () => base44.entities.Appointment.list('-date', 200),
   });
 
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ['pipeline-campaigns'],
+    queryFn: () => base44.entities.Campaign.filter({ status: 'ativa' }),
+  });
+
   const updateClient = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Client.update(id, data),
     onSuccess: () => queryClient.invalidateQueries(['pipeline-clients']),
@@ -101,7 +107,19 @@ export default function SalesPipeline() {
   };
 
   const getClientsByStage = (stageId) => {
-    return clients.filter(c => (c.funnel_stage || 'lead') === stageId);
+    return clients.filter(c => {
+      const matchesStage = (c.funnel_stage || 'lead') === stageId;
+      const matchesCampaign = selectedCampaigns.length === 0 || selectedCampaigns.includes(c.campaign_id);
+      return matchesStage && matchesCampaign;
+    });
+  };
+
+  const toggleCampaign = (campaignId) => {
+    setSelectedCampaigns(prev => 
+      prev.includes(campaignId)
+        ? prev.filter(id => id !== campaignId)
+        : [...prev, campaignId]
+    );
   };
 
   const stageStats = FUNNEL_STAGES.map(stage => ({
@@ -143,7 +161,45 @@ export default function SalesPipeline() {
               : 'Visualização do funil (sem permissão para editar)'}
           </p>
         </div>
-        <div className="flex gap-4 items-center">
+        <div className="flex gap-4 items-center flex-wrap">
+          {/* Filtro por Campanha */}
+          {campaigns.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Filter className="w-4 h-4" />
+                  Campanhas
+                  {selectedCampaigns.length > 0 && (
+                    <Badge className="ml-1 bg-[#6B2D8B] text-white">{selectedCampaigns.length}</Badge>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {campaigns.map(campaign => (
+                  <DropdownMenuItem
+                    key={campaign.id}
+                    onClick={() => toggleCampaign(campaign.id)}
+                    className="gap-2"
+                  >
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                      selectedCampaigns.includes(campaign.id) 
+                        ? 'bg-[#6B2D8B] border-[#6B2D8B] text-white' 
+                        : 'border-slate-300'
+                    }`}>
+                      {selectedCampaigns.includes(campaign.id) && '✓'}
+                    </div>
+                    {campaign.name}
+                  </DropdownMenuItem>
+                ))}
+                {selectedCampaigns.length > 0 && (
+                  <DropdownMenuItem onClick={() => setSelectedCampaigns([])} className="text-red-600">
+                    Limpar filtros
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           <Button
             variant={showScores ? "default" : "outline"}
             size="sm"

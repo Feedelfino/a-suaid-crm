@@ -292,6 +292,10 @@ export default function Admin() {
             <Shield className="w-4 h-4" />
             Acessos e Funções
           </TabsTrigger>
+          <TabsTrigger value="categories" className="flex items-center gap-2">
+            <Package className="w-4 h-4" />
+            Categorias
+          </TabsTrigger>
           <TabsTrigger value="products" className="flex items-center gap-2">
             <Package className="w-4 h-4" />
             Produtos
