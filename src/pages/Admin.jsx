@@ -7,6 +7,8 @@ import {
   Shield, CheckCircle, XCircle, UserCog, Save, AtSign
 } from 'lucide-react';
 import NicknameEditor from '@/components/admin/NicknameEditor';
+import CategoryManager from '@/components/admin/CategoryManager';
+import GoalManager from '@/components/admin/GoalManager';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -611,6 +613,11 @@ export default function Admin() {
 
 
 
+        {/* Categories Tab */}
+        <TabsContent value="categories" className="mt-6">
+          <CategoryManager />
+        </TabsContent>
+
         {/* Products Tab */}
         <TabsContent value="products" className="mt-6">
           <Card className="border-0 shadow-lg">
@@ -761,120 +768,7 @@ export default function Admin() {
 
         {/* Goals Tab */}
         <TabsContent value="goals" className="mt-6">
-          <Card className="border-0 shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Target className="w-5 h-5 text-[#6B2D8B]" />
-                Metas
-              </CardTitle>
-              <Dialog open={goalDialog} onOpenChange={setGoalDialog}>
-                <DialogTrigger asChild>
-                  <Button className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Nova Meta
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Nova Meta</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Mês *</Label>
-                      <Input
-                        type="month"
-                        value={goalForm.month}
-                        onChange={(e) => setGoalForm({ ...goalForm, month: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Agente (deixe vazio para meta da empresa)</Label>
-                      <Select 
-                        value={goalForm.agent} 
-                        onValueChange={(v) => setGoalForm({ ...goalForm, agent: v })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Meta da Empresa" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={null}>Meta da Empresa</SelectItem>
-                          {['agent_1', 'agent_2', 'agent_3', 'agent_4'].map((key) => (
-                            <SelectItem key={key} value={agentNames[key]}>{agentNames[key]}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Meta em Valor (R$) *</Label>
-                      <Input
-                        type="number"
-                        value={goalForm.goal_value}
-                        onChange={(e) => setGoalForm({ ...goalForm, goal_value: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Meta em Quantidade</Label>
-                      <Input
-                        type="number"
-                        value={goalForm.goal_quantity}
-                        onChange={(e) => setGoalForm({ ...goalForm, goal_quantity: e.target.value })}
-                      />
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4">
-                      <Button variant="outline" onClick={() => setGoalDialog(false)}>
-                        Cancelar
-                      </Button>
-                      <Button 
-                        onClick={() => createGoal.mutate(goalForm)}
-                        className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]"
-                      >
-                        Criar Meta
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mês</TableHead>
-                    <TableHead>Agente</TableHead>
-                    <TableHead>Meta (R$)</TableHead>
-                    <TableHead>Meta (Qtd)</TableHead>
-                    <TableHead>Alcançado</TableHead>
-                    <TableHead className="w-24">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {goals.map((goal) => (
-                    <TableRow key={goal.id}>
-                      <TableCell className="font-medium">{goal.month}</TableCell>
-                      <TableCell>{goal.agent || 'Empresa'}</TableCell>
-                      <TableCell>R$ {(goal.goal_value || 0).toLocaleString('pt-BR')}</TableCell>
-                      <TableCell>{goal.goal_quantity || '-'}</TableCell>
-                      <TableCell>R$ {(goal.achieved_value || 0).toLocaleString('pt-BR')}</TableCell>
-                      <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => deleteGoal.mutate(goal.id)}
-                        >
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {goals.length === 0 && (
-                <p className="text-center py-8 text-slate-500">Nenhuma meta cadastrada</p>
-              )}
-            </CardContent>
-          </Card>
+          <GoalManager />
         </TabsContent>
       </Tabs>
     </div>
