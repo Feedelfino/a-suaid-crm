@@ -272,7 +272,7 @@ export default function Tasks() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card className="border-0 shadow-lg">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
@@ -308,6 +308,21 @@ export default function Tasks() {
               <div>
                 <p className="text-sm text-slate-500">Concluídas</p>
                 <p className="text-2xl font-bold text-slate-800">{tasksByStatus.concluida.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-lg border-l-4 border-l-red-500">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+                <AlertCircle className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-500">Atrasadas</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {tasksByStatus.pendente.filter(t => t.due_date && isPast(parseISO(t.due_date))).length}
+                </p>
               </div>
             </div>
           </CardContent>
