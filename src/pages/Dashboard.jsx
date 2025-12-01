@@ -352,6 +352,61 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Métricas de Agenda */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-[#6B2D8B]" />
+                Métricas de Reuniões e Follow-ups
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <div className="text-center p-4 rounded-xl bg-blue-50 border border-blue-100">
+                  <p className="text-3xl font-bold text-blue-600">
+                    {monthAppointments.length}
+                  </p>
+                  <p className="text-sm text-blue-600 mt-1">Reuniões Marcadas</p>
+                </div>
+                <div className="text-center p-4 rounded-xl bg-green-50 border border-green-100">
+                  <p className="text-3xl font-bold text-green-600">
+                    {monthAppointments.filter(a => a.status === 'concluida').length}
+                  </p>
+                  <p className="text-sm text-green-600 mt-1">Concluídas</p>
+                </div>
+                <div className="text-center p-4 rounded-xl bg-orange-50 border border-orange-100">
+                  <p className="text-3xl font-bold text-orange-600">
+                    {monthAppointments.filter(a => a.status === 'nao_compareceu').length}
+                  </p>
+                  <p className="text-sm text-orange-600 mt-1">No-show</p>
+                </div>
+                <div className="text-center p-4 rounded-xl bg-purple-50 border border-purple-100">
+                  <p className="text-3xl font-bold text-purple-600">
+                    {monthAppointments.filter(a => a.appointment_type === 'telefone').length}
+                  </p>
+                  <p className="text-sm text-purple-600 mt-1">Ligações</p>
+                </div>
+                <div className="text-center p-4 rounded-xl bg-amber-50 border border-amber-100">
+                  <p className="text-3xl font-bold text-amber-600">
+                    {monthInteractions.filter(i => i.interaction_type === 'followup_agendado').length}
+                  </p>
+                  <p className="text-sm text-amber-600 mt-1">Follow-ups</p>
+                </div>
+                <div className="text-center p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+                  <p className="text-3xl font-bold text-emerald-600">
+                    {monthAppointments.length > 0 
+                      ? ((monthAppointments.filter(a => 
+                          ['concluida'].includes(a.status) && 
+                          monthInteractions.some(i => i.client_id === a.client_id && i.tabulation === 'venda_feita')
+                        ).length / monthAppointments.filter(a => a.status === 'concluida').length) * 100).toFixed(0)
+                      : 0}%
+                  </p>
+                  <p className="text-sm text-emerald-600 mt-1">Conversão Pós-Reunião</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </>
       ) : (
         <>
