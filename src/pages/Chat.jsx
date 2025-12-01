@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { 
-  Send, Search, MessageSquare, User, Check, CheckCheck
+  Send, Search, MessageSquare, User, Check, CheckCheck, Circle
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -105,6 +105,7 @@ export default function Chat() {
         receiver_name: selectedUser.full_name,
         message,
         conversation_id: getConversationId(user.email, selectedUser.email),
+        status: 'sent', // Status: sent, delivered, read
       });
     },
     onSuccess: () => {
@@ -285,8 +286,10 @@ export default function Chat() {
                             </span>
                             {isOwn && (
                               msg.read 
-                                ? <CheckCheck className="w-3 h-3 text-blue-500" />
-                                : <Check className="w-3 h-3 text-slate-400" />
+                                ? <CheckCheck className="w-3 h-3 text-blue-500" title="Lida" />
+                                : msg.status === 'delivered'
+                                  ? <CheckCheck className="w-3 h-3 text-slate-400" title="Entregue" />
+                                  : <Check className="w-3 h-3 text-slate-400" title="Enviada" />
                             )}
                           </div>
                         </div>
