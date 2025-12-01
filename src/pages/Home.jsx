@@ -22,6 +22,7 @@ import {
   GitBranch
 } from 'lucide-react';
 import { checkAndCreateNotifications } from '@/components/notifications/NotificationGenerator';
+import SmartAlerts from '@/components/notifications/SmartAlerts';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -198,6 +199,9 @@ export default function Home() {
           </Card>
         </Link>
       </div>
+
+      {/* Smart Alerts */}
+      <SmartAlerts userEmail={user?.email} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Today's Tasks */}
