@@ -18,6 +18,7 @@ import Notes from './pages/Notes';
 import Chat from './pages/Chat';
 import Renewals from './pages/Renewals';
 import AgentPerformance from './pages/AgentPerformance';
+import HelpCenter from './pages/HelpCenter';
 import __Layout from './Layout.jsx';
 
 
@@ -42,6 +43,7 @@ export const PAGES = {
     "Chat": Chat,
     "Renewals": Renewals,
     "AgentPerformance": AgentPerformance,
+    "HelpCenter": HelpCenter,
 }
 
 export const pagesConfig = {
