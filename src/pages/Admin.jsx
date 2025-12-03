@@ -9,6 +9,7 @@ import {
 import NicknameEditor from '@/components/admin/NicknameEditor';
 import CategoryManager from '@/components/admin/CategoryManager';
 import GoalManager from '@/components/admin/GoalManager';
+import RoleManager from '@/components/admin/RoleManager';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -292,7 +293,11 @@ export default function Admin() {
         <TabsList className="bg-white shadow-sm border flex-wrap">
           <TabsTrigger value="access" className="flex items-center gap-2">
             <Shield className="w-4 h-4" />
-            Acessos e Funções
+            Acessos
+          </TabsTrigger>
+          <TabsTrigger value="roles" className="flex items-center gap-2">
+            <UserCog className="w-4 h-4" />
+            Funções
           </TabsTrigger>
           <TabsTrigger value="categories" className="flex items-center gap-2">
             <Package className="w-4 h-4" />
@@ -612,6 +617,11 @@ export default function Admin() {
         </TabsContent>
 
 
+
+        {/* Roles Tab */}
+        <TabsContent value="roles" className="mt-6">
+          <RoleManager />
+        </TabsContent>
 
         {/* Categories Tab */}
         <TabsContent value="categories" className="mt-6">

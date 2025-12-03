@@ -60,7 +60,7 @@ export default function Home() {
   });
 
   const { data: goals = [] } = useQuery({
-    queryKey: ['current-goal'],
+    queryKey: ['current-goals'],
     queryFn: () => base44.entities.Goal.filter({ month: format(new Date(), 'yyyy-MM') }),
   });
 
@@ -69,11 +69,13 @@ export default function Home() {
     return isToday(parseISO(t.due_date));
   });
 
-  const companyGoal = goals.find(g => !g.agent);
-  const myGoal = goals.find(g => g.agent === user?.email);
-  const displayGoal = myGoal || companyGoal;
-  const goalProgress = displayGoal ? Math.min((displayGoal.achieved_value / displayGoal.goal_value) * 100, 100) : 0;
-  const companyProgress = companyGoal ? Math.min((companyGoal.achieved_value / companyGoal.goal_value) * 100, 100) : 0;
+  // Meta da empresa (sem agent_email definido)
+  const companyGoal = goals.find(g => !g.agent_email && !g.agent);
+  // Meta individual do usuário logado (por email)
+  const myGoal = goals.find(g => g.agent_email === user?.email);
+  
+  const companyProgress = companyGoal ? Math.min((companyGoal.achieved_value || 0) / companyGoal.goal_value * 100, 100) : 0;
+  const goalProgress = myGoal ? Math.min((myGoal.achieved_value || 0) / myGoal.goal_value * 100, 100) : 0;
 
   const taskTypeIcons = {
     reuniao_presencial: MapPin,

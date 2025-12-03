@@ -40,9 +40,8 @@ export default function GoalManager() {
   const [goalType, setGoalType] = useState('mensal');
   const { accessRecords } = useUserDisplayName();
   
-  const approvedAgents = accessRecords.filter(r => 
-    r.roles?.includes('agente_comercial') || r.roles?.includes('gerente')
-  );
+  // Todos os usuários aprovados podem receber metas
+  const approvedAgents = accessRecords.filter(r => r.status === 'approved');
 
   const [formData, setFormData] = useState({
     period_type: 'mensal',
@@ -50,6 +49,7 @@ export default function GoalManager() {
     quarter: Math.ceil((new Date().getMonth() + 1) / 3),
     month: format(new Date(), 'yyyy-MM'),
     agent: '',
+    agent_email: '',
     goal_value: '',
     goal_quantity: '',
   });
@@ -83,6 +83,7 @@ export default function GoalManager() {
       quarter: Math.ceil((new Date().getMonth() + 1) / 3),
       month: format(new Date(), 'yyyy-MM'),
       agent: '',
+      agent_email: '',
       goal_value: '',
       goal_quantity: '',
     });
@@ -224,10 +225,17 @@ export default function GoalManager() {
               )}
 
               <div className="space-y-2">
-                <Label>Agente (vazio = meta da empresa)</Label>
+                <Label>Usuário (vazio = meta da empresa)</Label>
                 <Select 
-                  value={formData.agent} 
-                  onValueChange={(v) => setFormData({ ...formData, agent: v })}
+                  value={formData.agent_email || ''} 
+                  onValueChange={(v) => {
+                    const selectedUser = approvedAgents.find(a => a.user_email === v);
+                    setFormData({ 
+                      ...formData, 
+                      agent_email: v || '',
+                      agent: selectedUser ? (selectedUser.nickname || selectedUser.user_name) : ''
+                    });
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Meta da Empresa" />
@@ -235,8 +243,8 @@ export default function GoalManager() {
                   <SelectContent>
                     <SelectItem value={null}>Meta da Empresa</SelectItem>
                     {approvedAgents.map((agent) => (
-                      <SelectItem key={agent.id} value={agent.nickname || agent.user_name}>
-                        {agent.nickname || agent.user_name}
+                      <SelectItem key={agent.user_email} value={agent.user_email}>
+                        {agent.nickname || agent.user_name} ({agent.user_email})
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -5,7 +5,7 @@ import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'da
 import { ptBR } from 'date-fns/locale';
 import { 
   FileText, Download, Filter, Calendar, Users, 
-  DollarSign, BarChart3, TrendingUp
+  DollarSign, BarChart3, TrendingUp, Sparkles
 } from 'lucide-react';
 import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,15 +28,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import SalesCharts from '@/components/reports/SalesCharts';
+import AIInsights from '@/components/reports/AIInsights';
 
 export default function Reports() {
-  const [reportType, setReportType] = useState('sales');
+  const [reportType, setReportType] = useState('overview');
   const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
   const [agentFilter, setAgentFilter] = useState('all');
   const { getDisplayName, accessRecords } = useUserDisplayName();
   
-  // Usuários aprovados como agentes
   const approvedUsers = accessRecords.filter(r => r.status === 'approved');
 
   const { data: interactions = [] } = useQuery({
@@ -59,7 +60,11 @@ export default function Reports() {
     queryFn: () => base44.entities.Campaign.list(),
   });
 
-  // Filter by date range
+  const { data: goals = [] } = useQuery({
+    queryKey: ['report-goals'],
+    queryFn: () => base44.entities.Goal.list(),
+  });
+
   const filterByDate = (items, dateField) => {
     return items.filter(item => {
       if (!item[dateField]) return false;
@@ -74,12 +79,10 @@ export default function Reports() {
   const filteredInteractions = filterByDate(interactions, 'created_date');
   const filteredAppointments = filterByDate(appointments, 'date');
 
-  // Sales report data
   const salesData = filteredInteractions.filter(i => 
     i.tabulation === 'venda_feita' || i.interaction_type === 'venda_fechada'
   );
 
-  // Agent performance data - usando nomes reais dos usuários
   const agentData = approvedUsers.map(userAccess => {
     const agentName = userAccess.nickname || userAccess.user_name;
     const agentEmail = userAccess.user_email;
@@ -104,7 +107,6 @@ export default function Reports() {
     };
   });
 
-  // Product performance data
   const productData = Object.entries(
     filteredInteractions.reduce((acc, i) => {
       if (i.product_offered) {
@@ -139,10 +141,10 @@ export default function Reports() {
   };
 
   const totalSales = salesData.reduce((sum, s) => sum + (s.sale_value || 0), 0);
+  const periodLabel = `${format(parseISO(startDate), 'dd/MM/yyyy')} - ${format(parseISO(endDate), 'dd/MM/yyyy')}`;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Relatórios</h1>
@@ -150,7 +152,6 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Filters */}
       <Card className="border-0 shadow-lg">
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row gap-4 items-end">
@@ -190,72 +191,41 @@ export default function Reports() {
         </CardContent>
       </Card>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="border-0 shadow-lg">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-[#6B2D8B]/10 flex items-center justify-center">
-                <BarChart3 className="w-6 h-6 text-[#6B2D8B]" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Interações</p>
-                <p className="text-2xl font-bold text-slate-800">{filteredInteractions.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-lg">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Vendas</p>
-                <p className="text-2xl font-bold text-slate-800">{salesData.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-lg">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Valor Total</p>
-                <p className="text-2xl font-bold text-slate-800">
-                  R$ {totalSales.toLocaleString('pt-BR')}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-lg">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-cyan-100 flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-cyan-600" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Agendamentos</p>
-                <p className="text-2xl font-bold text-slate-800">{filteredAppointments.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Reports Tabs */}
       <Tabs value={reportType} onValueChange={setReportType}>
-        <TabsList className="bg-white shadow-sm border">
+        <TabsList className="bg-white shadow-sm border flex-wrap">
+          <TabsTrigger value="overview" className="gap-2">
+            <BarChart3 className="w-4 h-4" />
+            Visão Geral
+          </TabsTrigger>
+          <TabsTrigger value="insights" className="gap-2">
+            <Sparkles className="w-4 h-4" />
+            Insights IA
+          </TabsTrigger>
           <TabsTrigger value="sales">Vendas</TabsTrigger>
           <TabsTrigger value="agents">Por Agente</TabsTrigger>
           <TabsTrigger value="products">Por Produto</TabsTrigger>
           <TabsTrigger value="campaigns">Campanhas</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="overview" className="mt-6">
+          <SalesCharts 
+            salesData={salesData}
+            startDate={startDate}
+            endDate={endDate}
+            interactions={filteredInteractions}
+          />
+        </TabsContent>
+
+        <TabsContent value="insights" className="mt-6">
+          <AIInsights
+            salesData={salesData}
+            interactions={filteredInteractions}
+            clients={clients}
+            campaigns={campaigns}
+            goals={goals}
+            period={periodLabel}
+          />
+        </TabsContent>
 
         <TabsContent value="sales" className="mt-6">
           <Card className="border-0 shadow-lg">
@@ -296,7 +266,7 @@ export default function Reports() {
                       <TableCell>
                         {sale.created_date && format(parseISO(sale.created_date), 'dd/MM/yyyy')}
                       </TableCell>
-                      <TableCell>{sale.agent_name}</TableCell>
+                      <TableCell>{getDisplayName(sale.agent_email, sale.agent_name)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -335,7 +305,7 @@ export default function Reports() {
                 </TableHeader>
                 <TableBody>
                   {agentData.map((agent) => (
-                    <TableRow key={agent.agent}>
+                    <TableRow key={agent.email}>
                       <TableCell className="font-medium">{agent.agent}</TableCell>
                       <TableCell>{agent.totalInteractions}</TableCell>
                       <TableCell>{agent.sales}</TableCell>
