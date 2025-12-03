@@ -35,11 +35,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import CampaignLeadsManager from '@/components/campaigns/CampaignLeadsManager';
 
 export default function Campaigns() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState(null);
+  const [managingLeadsCampaign, setManagingLeadsCampaign] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -377,6 +379,12 @@ export default function Campaigns() {
                         Encerrar
                       </DropdownMenuItem>
                       <DropdownMenuItem 
+                        onClick={() => setManagingLeadsCampaign(campaign)}
+                      >
+                        <Users className="w-4 h-4 mr-2" />
+                        Gerenciar Leads
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
                         className="text-red-600"
                         onClick={() => deleteCampaign.mutate(campaign.id)}
                       >
@@ -438,6 +446,18 @@ export default function Campaigns() {
           </CardContent>
         </Card>
       )}
+
+      {/* Dialog para gerenciar leads da campanha */}
+      <Dialog open={!!managingLeadsCampaign} onOpenChange={(open) => !open && setManagingLeadsCampaign(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          {managingLeadsCampaign && (
+            <CampaignLeadsManager 
+              campaign={managingLeadsCampaign} 
+              onClose={() => setManagingLeadsCampaign(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
