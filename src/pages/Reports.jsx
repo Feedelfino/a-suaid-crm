@@ -7,7 +7,7 @@ import {
   FileText, Download, Filter, Calendar, Users, 
   DollarSign, BarChart3, TrendingUp
 } from 'lucide-react';
-import { useAgentNames } from '@/components/hooks/useAgentNames';
+import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +34,10 @@ export default function Reports() {
   const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
   const [agentFilter, setAgentFilter] = useState('all');
-  const { agentList } = useAgentNames();
+  const { getDisplayName, accessRecords } = useUserDisplayName();
+  
+  // Usuários aprovados como agentes
+  const approvedUsers = accessRecords.filter(r => r.status === 'approved');
 
   const { data: interactions = [] } = useQuery({
     queryKey: ['report-interactions'],
@@ -76,14 +79,21 @@ export default function Reports() {
     i.tabulation === 'venda_feita' || i.interaction_type === 'venda_fechada'
   );
 
-  // Agent performance data
-  const agentData = agentList.map(({ name: agent }) => {
-    const agentInteractions = filteredInteractions.filter(i => i.agent_name === agent);
+  // Agent performance data - usando nomes reais dos usuários
+  const agentData = approvedUsers.map(userAccess => {
+    const agentName = userAccess.nickname || userAccess.user_name;
+    const agentEmail = userAccess.user_email;
+    const agentInteractions = filteredInteractions.filter(i => 
+      i.agent_email === agentEmail || i.agent_name === agentName || i.created_by === agentEmail
+    );
     const agentSales = agentInteractions.filter(i => i.tabulation === 'venda_feita');
-    const agentAppointments = filteredAppointments.filter(a => a.agent === agent);
+    const agentAppointments = filteredAppointments.filter(a => 
+      a.agent_email === agentEmail || a.agent === agentName
+    );
     
     return {
-      agent,
+      agent: agentName,
+      email: agentEmail,
       totalInteractions: agentInteractions.length,
       sales: agentSales.length,
       salesValue: agentSales.reduce((sum, s) => sum + (s.sale_value || 0), 0),
@@ -168,8 +178,10 @@ export default function Reports() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os Agentes</SelectItem>
-                  {agentList.map(agent => (
-                    <SelectItem key={agent.key} value={agent.name}>{agent.name}</SelectItem>
+                  {approvedUsers.map(u => (
+                    <SelectItem key={u.user_email} value={u.user_email}>
+                      {u.nickname || u.user_name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

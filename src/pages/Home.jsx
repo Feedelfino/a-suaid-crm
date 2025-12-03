@@ -69,8 +69,11 @@ export default function Home() {
     return isToday(parseISO(t.due_date));
   });
 
-  const myGoal = goals.find(g => g.agent === user?.email) || goals.find(g => !g.agent);
-  const goalProgress = myGoal ? Math.min((myGoal.achieved_value / myGoal.goal_value) * 100, 100) : 0;
+  const companyGoal = goals.find(g => !g.agent);
+  const myGoal = goals.find(g => g.agent === user?.email);
+  const displayGoal = myGoal || companyGoal;
+  const goalProgress = displayGoal ? Math.min((displayGoal.achieved_value / displayGoal.goal_value) * 100, 100) : 0;
+  const companyProgress = companyGoal ? Math.min((companyGoal.achieved_value / companyGoal.goal_value) * 100, 100) : 0;
 
   const taskTypeIcons = {
     reuniao_presencial: MapPin,
@@ -167,18 +170,35 @@ export default function Home() {
         <Link to={createPageUrl('Dashboard')}>
           <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 hover:shadow-xl transition-all cursor-pointer hover:scale-[1.02]">
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-3">
                 <div>
-                  <p className="text-sm text-slate-500 mb-1">Meta do Mês</p>
-                  <p className="text-3xl font-bold text-slate-800">
-                    {goalProgress.toFixed(0)}%
-                  </p>
+                  <p className="text-sm text-slate-500 mb-1">Metas do Mês</p>
                 </div>
                 <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
                   <Target className="w-7 h-7 text-white" />
                 </div>
               </div>
-              <Progress value={goalProgress} className="mt-3 h-2" />
+              {companyGoal && (
+                <div className="mb-2">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-slate-500">Empresa</span>
+                    <span className="font-semibold text-slate-700">{companyProgress.toFixed(0)}%</span>
+                  </div>
+                  <Progress value={companyProgress} className="h-1.5" />
+                </div>
+              )}
+              {myGoal && (
+                <div>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-slate-500">Individual</span>
+                    <span className="font-semibold text-[#6B2D8B]">{goalProgress.toFixed(0)}%</span>
+                  </div>
+                  <Progress value={goalProgress} className="h-1.5" />
+                </div>
+              )}
+              {!companyGoal && !myGoal && (
+                <p className="text-sm text-slate-400">Sem metas definidas</p>
+              )}
             </CardContent>
           </Card>
         </Link>

@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import ReactMarkdown from 'react-markdown';
 import { 
   BookOpen, Search, ChevronRight, HelpCircle, FileText,
   MessageSquare, Home, Users, GitBranch, BarChart3, Target,
-  Phone, Calendar, StickyNote, Settings, ArrowLeft
+  Phone, Calendar, StickyNote, Settings, ArrowLeft, Pencil, Plus
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import HelpArticleEditor from '@/components/help/HelpArticleEditor';
 
 const CATEGORIES = [
   { id: 'introducao', name: 'Introdução', icon: Home, color: 'from-blue-500 to-blue-600' },
@@ -44,7 +44,6 @@ const SUBCATEGORIES = {
 };
 
 const DEFAULT_ARTICLES = [
-  // Introdução
   {
     category: 'introducao',
     title: 'Bem-vindo ao CRM A SUA.ID',
@@ -71,33 +70,9 @@ Registre e acompanhe todas as interações com clientes - ligações, e-mails, W
 Base completa de clientes e leads com todas as informações relevantes.
 
 ### 📊 Dashboard
-Métricas e gráficos para análise de desempenho.
-
-## Filosofia Operacional
-
-Nosso CRM é baseado em três pilares:
-1. **Simplicidade** - Interface intuitiva e fácil de usar
-2. **Produtividade** - Automatização de tarefas repetitivas
-3. **Colaboração** - Comunicação integrada entre equipes`,
+Métricas e gráficos para análise de desempenho.`,
     order: 1,
     tags: ['inicio', 'introducao', 'objetivo']
-  },
-  // FAQ
-  {
-    category: 'faq',
-    subcategory: 'financeiro',
-    title: 'Como registrar despesas?',
-    content: `# Como registrar despesas?
-
-Atualmente o CRM foca em gestão comercial. Para registro de despesas, recomendamos:
-
-1. Utilizar a área de **Campanhas** para vincular custos de marketing
-2. Registrar observações financeiras nas notas do cliente
-3. Usar a integração com sistemas financeiros externos
-
-> 💡 **Dica**: Você pode adicionar campos personalizados para controle financeiro básico.`,
-    order: 1,
-    tags: ['despesa', 'financeiro', 'custo']
   },
   {
     category: 'faq',
@@ -120,72 +95,17 @@ O Funil de Vendas permite visualizar e gerenciar a jornada de cada cliente.
 
 - **Arrastar e soltar**: Mova clientes entre etapas
 - **Lead Score IA**: Ative para ver pontuação automática
-- **Filtros**: Use filtros por campanha ou agente
+- **Filtros**: Use filtros por campanha
 
-## Dicas
+## Personalização
 
-- Mantenha o funil atualizado
-- Use interações para registrar cada avanço
-- Acompanhe o Lead Score para priorizar`,
+Administradores podem:
+- Renomear etapas
+- Ativar/desativar etapas
+- Criar etapas personalizadas por campanha`,
     order: 2,
     tags: ['funil', 'pipeline', 'vendas', 'etapas']
   },
-  {
-    category: 'faq',
-    subcategory: 'interacoes',
-    title: 'Tipos de interações disponíveis',
-    content: `# Tipos de Interações
-
-## Tentativas
-- **Tentativa por E-mail** - E-mail sem resposta
-- **Tentativa por Telefone** - Ligação não atendida
-- **Tentativa por WhatsApp** - Mensagem enviada
-
-## Contatos
-- **Contato com Sucesso** - Comunicação efetiva
-- **Follow-up Agendado** - Retorno marcado
-- **Cliente Indeciso** - Aguardando decisão
-
-## Resultados
-- **Venda Fechada** - Negócio concluído
-- **Parceria** - Acordo de parceria
-- **Sem Interesse** - Cliente recusou`,
-    order: 1,
-    tags: ['interacao', 'contato', 'ligacao', 'email', 'whatsapp']
-  },
-  {
-    category: 'faq',
-    subcategory: 'metas',
-    title: 'Como funcionam as metas?',
-    content: `# Sistema de Metas
-
-O CRM suporta metas em três níveis:
-
-## Metas Anuais
-- Definida para todo o ano
-- Valor total a ser alcançado
-
-## Metas Trimestrais
-- Dividida em 4 trimestres
-- Soma deve compor a meta anual
-
-## Metas Mensais
-- Metas específicas por mês
-- Acompanhamento mais detalhado
-
-## Tipos de Meta
-- **Empresa**: Meta geral da organização
-- **Agente**: Meta individual por vendedor
-
-## Acompanhamento
-O Dashboard mostra:
-- Progresso em tempo real
-- Comparativo com período anterior
-- Projeção de atingimento`,
-    order: 1,
-    tags: ['meta', 'objetivo', 'vendas', 'desempenho']
-  },
-  // Tutoriais
   {
     category: 'tutoriais',
     title: 'Registrando sua primeira interação',
@@ -228,17 +148,35 @@ export default function HelpCenter() {
   const [selectedCategory, setSelectedCategory] = useState('introducao');
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState(null);
+  const [editingArticle, setEditingArticle] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const user = await base44.auth.me();
+        setIsAdmin(user.role === 'admin');
+      } catch (e) {}
+    };
+    checkAdmin();
+  }, []);
 
   const { data: articles = [] } = useQuery({
     queryKey: ['help-articles'],
     queryFn: () => base44.entities.HelpArticle.filter({ published: true }, 'order'),
   });
 
+  const { data: allArticles = [] } = useQuery({
+    queryKey: ['help-articles-admin'],
+    queryFn: () => base44.entities.HelpArticle.list('order'),
+    enabled: isAdmin,
+  });
+
   // Combinar artigos do banco com os padrão
-  const allArticles = [...DEFAULT_ARTICLES, ...articles];
+  const displayArticles = isAdmin ? [...DEFAULT_ARTICLES, ...allArticles] : [...DEFAULT_ARTICLES, ...articles];
 
   // Filtrar artigos
-  const filteredArticles = allArticles.filter(article => {
+  const filteredArticles = displayArticles.filter(article => {
     const matchesSearch = !searchTerm || 
       article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       article.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -258,18 +196,27 @@ export default function HelpCenter() {
     setSelectedArticle(null);
   };
 
+  const handleEdit = (article) => {
+    setEditingArticle(article);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="bg-gradient-to-r from-[#6B2D8B] via-[#8B4DAB] to-[#C71585] rounded-3xl p-8 text-white">
-        <div className="flex items-center gap-4 mb-4">
-          <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center">
-            <BookOpen className="w-8 h-8" />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center">
+              <BookOpen className="w-8 h-8" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold">Central de Ajuda</h1>
+              <p className="text-white/80">Manual do Usuário e Tutoriais</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold">Central de Ajuda</h1>
-            <p className="text-white/80">Manual do Usuário CRM</p>
-          </div>
+          {isAdmin && (
+            <HelpArticleEditor onSaved={() => setEditingArticle(null)} />
+          )}
         </div>
         
         {/* Search */}
@@ -284,25 +231,58 @@ export default function HelpCenter() {
         </div>
       </div>
 
+      {/* Editing Modal */}
+      {editingArticle && (
+        <HelpArticleEditor 
+          article={editingArticle} 
+          onClose={() => setEditingArticle(null)}
+          onSaved={() => setEditingArticle(null)}
+        />
+      )}
+
       {selectedArticle ? (
         /* Article View */
         <Card className="border-0 shadow-lg">
           <CardHeader>
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={handleBack}>
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div>
-                <Badge className="mb-2 bg-[#6B2D8B]/10 text-[#6B2D8B]">
-                  {CATEGORIES.find(c => c.id === selectedArticle.category)?.name}
-                </Badge>
-                <CardTitle className="text-xl">{selectedArticle.title}</CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button variant="ghost" size="icon" onClick={handleBack}>
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge className="bg-[#6B2D8B]/10 text-[#6B2D8B]">
+                      {CATEGORIES.find(c => c.id === selectedArticle.category)?.name}
+                    </Badge>
+                    {!selectedArticle.published && (
+                      <Badge variant="secondary">Rascunho</Badge>
+                    )}
+                  </div>
+                  <CardTitle className="text-xl">{selectedArticle.title}</CardTitle>
+                </div>
               </div>
+              {isAdmin && selectedArticle.id && (
+                <Button variant="outline" size="sm" onClick={() => handleEdit(selectedArticle)}>
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Editar
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent>
             <div className="prose prose-slate max-w-none">
-              <ReactMarkdown>{selectedArticle.content}</ReactMarkdown>
+              <ReactMarkdown
+                components={{
+                  img: ({ node, ...props }) => (
+                    <img {...props} className="rounded-lg max-w-full shadow-md" />
+                  ),
+                  video: ({ node, ...props }) => (
+                    <video {...props} controls className="rounded-lg max-w-full shadow-md" />
+                  ),
+                }}
+              >
+                {selectedArticle.content}
+              </ReactMarkdown>
             </div>
             
             {selectedArticle.tags && (
@@ -397,20 +377,30 @@ export default function HelpCenter() {
                     <p className="text-sm text-slate-400 mt-1">
                       Tente buscar por outras palavras-chave
                     </p>
+                    {isAdmin && (
+                      <HelpArticleEditor onSaved={() => {}} />
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {filteredArticles.map((article, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleArticleClick(article)}
+                      <div
+                        key={article.id || index}
                         className="w-full text-left p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-all group"
                       >
                         <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h3 className="font-medium text-slate-800 group-hover:text-[#6B2D8B] transition-colors">
-                              {article.title}
-                            </h3>
+                          <button
+                            onClick={() => handleArticleClick(article)}
+                            className="flex-1 text-left"
+                          >
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-medium text-slate-800 group-hover:text-[#6B2D8B] transition-colors">
+                                {article.title}
+                              </h3>
+                              {!article.published && (
+                                <Badge variant="secondary" className="text-xs">Rascunho</Badge>
+                              )}
+                            </div>
                             <p className="text-sm text-slate-500 mt-1 line-clamp-2">
                               {article.content.replace(/[#*`]/g, '').slice(0, 150)}...
                             </p>
@@ -423,10 +413,22 @@ export default function HelpCenter() {
                                 ))}
                               </div>
                             )}
+                          </button>
+                          <div className="flex items-center gap-2 ml-4">
+                            {isAdmin && article.id && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8"
+                                onClick={() => handleEdit(article)}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                            )}
+                            <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-[#6B2D8B]" />
                           </div>
-                          <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-[#6B2D8B] shrink-0 ml-4" />
                         </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 )}

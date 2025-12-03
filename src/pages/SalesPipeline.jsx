@@ -18,23 +18,26 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import LeadScoreCard, { calculateLeadScore, getNextBestAction } from '@/components/pipeline/LeadScoreCard';
+import FunnelConfigEditor from '@/components/pipeline/FunnelConfigEditor';
 
-const FUNNEL_STAGES = [
-  { id: 'lead', name: 'Lead', color: 'from-slate-400 to-slate-500' },
-  { id: 'contato', name: 'Contato', color: 'from-blue-400 to-blue-500' },
-  { id: 'qualificacao', name: 'Qualificação', color: 'from-cyan-400 to-cyan-500' },
-  { id: 'proposta', name: 'Proposta', color: 'from-purple-400 to-purple-500' },
-  { id: 'negociacao', name: 'Negociação', color: 'from-amber-400 to-amber-500' },
-  { id: 'fechamento', name: 'Fechamento', color: 'from-green-400 to-green-500' },
-  { id: 'perdido', name: 'Perdido', color: 'from-red-400 to-red-500' },
+const DEFAULT_STAGES = [
+  { id: 'lead', name: 'Lead', color: 'from-slate-400 to-slate-500', active: true },
+  { id: 'contato', name: 'Contato', color: 'from-blue-400 to-blue-500', active: true },
+  { id: 'qualificacao', name: 'Qualificação', color: 'from-cyan-400 to-cyan-500', active: true },
+  { id: 'proposta', name: 'Proposta', color: 'from-purple-400 to-purple-500', active: true },
+  { id: 'negociacao', name: 'Negociação', color: 'from-amber-400 to-amber-500', active: true },
+  { id: 'fechamento', name: 'Fechamento', color: 'from-green-400 to-green-500', active: true },
+  { id: 'perdido', name: 'Perdido', color: 'from-red-400 to-red-500', active: true },
 ];
 
 export default function SalesPipeline() {
@@ -42,14 +45,13 @@ export default function SalesPipeline() {
   const [showScores, setShowScores] = useState(true);
   const [user, setUser] = useState(null);
   const [userAccess, setUserAccess] = useState(null);
-  const [selectedCampaigns, setSelectedCampaigns] = useState([]);
+  const [selectedCampaign, setSelectedCampaign] = useState('all');
 
   React.useEffect(() => {
     const loadUser = async () => {
       try {
         const userData = await base44.auth.me();
         setUser(userData);
-        // Buscar funções do usuário
         const accessRecords = await base44.entities.UserAccess.filter({ user_email: userData.email });
         if (accessRecords.length > 0) {
           setUserAccess(accessRecords[0]);
@@ -59,11 +61,12 @@ export default function SalesPipeline() {
     loadUser();
   }, []);
 
-  // Verificar se pode editar o funil
   const canEditFunnel = user?.role === 'admin' || 
     userAccess?.roles?.includes('administrador') ||
     userAccess?.roles?.includes('gerente') ||
     userAccess?.roles?.includes('agente_comercial');
+
+  const isAdmin = user?.role === 'admin' || userAccess?.roles?.includes('administrador');
 
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ['pipeline-clients'],
@@ -82,8 +85,29 @@ export default function SalesPipeline() {
 
   const { data: campaigns = [] } = useQuery({
     queryKey: ['pipeline-campaigns'],
-    queryFn: () => base44.entities.Campaign.filter({ status: 'ativa' }),
+    queryFn: () => base44.entities.Campaign.list(),
   });
+
+  const { data: funnelConfigs = [] } = useQuery({
+    queryKey: ['funnel-configs'],
+    queryFn: () => base44.entities.FunnelConfig.list(),
+  });
+
+  // Obter etapas do funil baseado na campanha selecionada
+  const getFunnelStages = () => {
+    if (selectedCampaign === 'all') {
+      const defaultConfig = funnelConfigs.find(c => !c.campaign_id);
+      return (defaultConfig?.stages || DEFAULT_STAGES).filter(s => s.active);
+    }
+    const campaignConfig = funnelConfigs.find(c => c.campaign_id === selectedCampaign);
+    if (campaignConfig) {
+      return campaignConfig.stages.filter(s => s.active);
+    }
+    const defaultConfig = funnelConfigs.find(c => !c.campaign_id);
+    return (defaultConfig?.stages || DEFAULT_STAGES).filter(s => s.active);
+  };
+
+  const FUNNEL_STAGES = getFunnelStages();
 
   const updateClient = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Client.update(id, data),
@@ -92,7 +116,7 @@ export default function SalesPipeline() {
 
   const handleDragEnd = (result) => {
     if (!result.destination) return;
-    if (!canEditFunnel) return; // Bloquear se não tiver permissão
+    if (!canEditFunnel) return;
     
     const clientId = result.draggableId;
     const newStage = result.destination.droppableId;
@@ -109,17 +133,9 @@ export default function SalesPipeline() {
   const getClientsByStage = (stageId) => {
     return clients.filter(c => {
       const matchesStage = (c.funnel_stage || 'lead') === stageId;
-      const matchesCampaign = selectedCampaigns.length === 0 || selectedCampaigns.includes(c.campaign_id);
+      const matchesCampaign = selectedCampaign === 'all' || c.campaign_id === selectedCampaign;
       return matchesStage && matchesCampaign;
     });
-  };
-
-  const toggleCampaign = (campaignId) => {
-    setSelectedCampaigns(prev => 
-      prev.includes(campaignId)
-        ? prev.filter(id => id !== campaignId)
-        : [...prev, campaignId]
-    );
   };
 
   const stageStats = FUNNEL_STAGES.map(stage => ({
@@ -127,8 +143,11 @@ export default function SalesPipeline() {
     count: getClientsByStage(stage.id).length,
   }));
 
-  const totalValue = clients.reduce((sum, c) => {
-    // Estimate value based on stage
+  const filteredClients = selectedCampaign === 'all' 
+    ? clients 
+    : clients.filter(c => c.campaign_id === selectedCampaign);
+
+  const totalValue = filteredClients.reduce((sum, c) => {
     const stageMultipliers = {
       lead: 0.1,
       contato: 0.2,
@@ -161,43 +180,41 @@ export default function SalesPipeline() {
               : 'Visualização do funil (sem permissão para editar)'}
           </p>
         </div>
-        <div className="flex gap-4 items-center flex-wrap">
+        <div className="flex gap-3 items-center flex-wrap">
           {/* Filtro por Campanha */}
-          {campaigns.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Filter className="w-4 h-4" />
-                  Campanhas
-                  {selectedCampaigns.length > 0 && (
-                    <Badge className="ml-1 bg-[#6B2D8B] text-white">{selectedCampaigns.length}</Badge>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                {campaigns.map(campaign => (
-                  <DropdownMenuItem
-                    key={campaign.id}
-                    onClick={() => toggleCampaign(campaign.id)}
-                    className="gap-2"
-                  >
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-                      selectedCampaigns.includes(campaign.id) 
-                        ? 'bg-[#6B2D8B] border-[#6B2D8B] text-white' 
-                        : 'border-slate-300'
-                    }`}>
-                      {selectedCampaigns.includes(campaign.id) && '✓'}
-                    </div>
+          <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="Selecione uma campanha" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as Campanhas</SelectItem>
+              <DropdownMenuSeparator />
+              {campaigns.map(campaign => (
+                <SelectItem key={campaign.id} value={campaign.id}>
+                  <div className="flex items-center gap-2">
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs ${
+                        campaign.status === 'ativa' ? 'border-green-500 text-green-600' : 'border-slate-400'
+                      }`}
+                    >
+                      {campaign.status}
+                    </Badge>
                     {campaign.name}
-                  </DropdownMenuItem>
-                ))}
-                {selectedCampaigns.length > 0 && (
-                  <DropdownMenuItem onClick={() => setSelectedCampaigns([])} className="text-red-600">
-                    Limpar filtros
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Configuração de Etapas (apenas admin) */}
+          {isAdmin && (
+            <FunnelConfigEditor
+              campaigns={campaigns}
+              funnelConfigs={funnelConfigs}
+              selectedCampaign={selectedCampaign}
+              onConfigChange={() => queryClient.invalidateQueries(['funnel-configs'])}
+            />
           )}
 
           <Button
@@ -209,30 +226,47 @@ export default function SalesPipeline() {
             <Sparkles className="w-4 h-4 mr-2" />
             Lead Score AI
           </Button>
-          <Card className="border-0 shadow-md px-4 py-2">
-            <div className="flex items-center gap-3">
-              <Users className="w-5 h-5 text-[#6B2D8B]" />
-              <div>
-                <p className="text-xs text-slate-500">Total Clientes</p>
-                <p className="font-bold text-slate-800">{clients.length}</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="border-0 shadow-md px-4 py-2">
-            <div className="flex items-center gap-3">
-              <TrendingUp className="w-5 h-5 text-green-600" />
-              <div>
-                <p className="text-xs text-slate-500">Valor Potencial</p>
-                <p className="font-bold text-slate-800">R$ {totalValue.toLocaleString('pt-BR')}</p>
-              </div>
-            </div>
-          </Card>
         </div>
       </div>
 
+      {/* Stats Cards */}
+      <div className="flex gap-4 flex-wrap">
+        <Card className="border-0 shadow-md px-4 py-2">
+          <div className="flex items-center gap-3">
+            <Users className="w-5 h-5 text-[#6B2D8B]" />
+            <div>
+              <p className="text-xs text-slate-500">Clientes no Funil</p>
+              <p className="font-bold text-slate-800">{filteredClients.length}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="border-0 shadow-md px-4 py-2">
+          <div className="flex items-center gap-3">
+            <TrendingUp className="w-5 h-5 text-green-600" />
+            <div>
+              <p className="text-xs text-slate-500">Valor Potencial</p>
+              <p className="font-bold text-slate-800">R$ {totalValue.toLocaleString('pt-BR')}</p>
+            </div>
+          </div>
+        </Card>
+        {selectedCampaign !== 'all' && (
+          <Card className="border-0 shadow-md px-4 py-2 bg-[#6B2D8B]/5">
+            <div className="flex items-center gap-3">
+              <Filter className="w-5 h-5 text-[#6B2D8B]" />
+              <div>
+                <p className="text-xs text-slate-500">Campanha</p>
+                <p className="font-bold text-[#6B2D8B]">
+                  {campaigns.find(c => c.id === selectedCampaign)?.name || 'Selecionada'}
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+      </div>
+
       {/* Funnel Stats */}
-      <div className="grid grid-cols-7 gap-2">
-        {stageStats.map((stage, index) => (
+      <div className={`grid gap-2`} style={{ gridTemplateColumns: `repeat(${FUNNEL_STAGES.length}, 1fr)` }}>
+        {stageStats.map((stage) => (
           <div key={stage.id} className="text-center">
             <div className={`h-2 rounded-full bg-gradient-to-r ${stage.color}`} />
             <p className="text-xs text-slate-500 mt-2">{stage.name}</p>
