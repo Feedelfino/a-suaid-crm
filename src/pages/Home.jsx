@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { checkAndCreateNotifications } from '@/components/notifications/NotificationGenerator';
 import SmartAlerts from '@/components/notifications/SmartAlerts';
+import GoalsSummary from '@/components/home/GoalsSummary';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,23 +60,10 @@ export default function Home() {
     }, 'time', 10),
   });
 
-  const { data: goals = [] } = useQuery({
-    queryKey: ['current-goals'],
-    queryFn: () => base44.entities.Goal.filter({ month: format(new Date(), 'yyyy-MM') }),
-  });
-
   const todayTasks = tasks.filter(t => {
     if (!t.due_date) return false;
     return isToday(parseISO(t.due_date));
   });
-
-  // Meta da empresa (sem agent_email definido)
-  const companyGoal = goals.find(g => !g.agent_email && !g.agent);
-  // Meta individual do usuário logado (por email)
-  const myGoal = goals.find(g => g.agent_email === user?.email);
-  
-  const companyProgress = companyGoal ? Math.min((companyGoal.achieved_value || 0) / companyGoal.goal_value * 100, 100) : 0;
-  const goalProgress = myGoal ? Math.min((myGoal.achieved_value || 0) / myGoal.goal_value * 100, 100) : 0;
 
   const taskTypeIcons = {
     reuniao_presencial: MapPin,
@@ -172,35 +160,15 @@ export default function Home() {
         <Link to={createPageUrl('Dashboard')}>
           <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 hover:shadow-xl transition-all cursor-pointer hover:scale-[1.02]">
             <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-slate-500 mb-1">Metas do Mês</p>
+                  <p className="text-sm text-slate-500 mb-1">Metas</p>
+                  <p className="text-xl font-bold text-slate-800">Ver Progresso</p>
                 </div>
                 <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
                   <Target className="w-7 h-7 text-white" />
                 </div>
               </div>
-              {companyGoal && (
-                <div className="mb-2">
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-slate-500">Empresa</span>
-                    <span className="font-semibold text-slate-700">{companyProgress.toFixed(0)}%</span>
-                  </div>
-                  <Progress value={companyProgress} className="h-1.5" />
-                </div>
-              )}
-              {myGoal && (
-                <div>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-slate-500">Individual</span>
-                    <span className="font-semibold text-[#6B2D8B]">{goalProgress.toFixed(0)}%</span>
-                  </div>
-                  <Progress value={goalProgress} className="h-1.5" />
-                </div>
-              )}
-              {!companyGoal && !myGoal && (
-                <p className="text-sm text-slate-400">Sem metas definidas</p>
-              )}
             </CardContent>
           </Card>
         </Link>
@@ -221,6 +189,9 @@ export default function Home() {
           </Card>
         </Link>
       </div>
+
+      {/* Goals Summary */}
+      <GoalsSummary userEmail={user?.email} />
 
       {/* Smart Alerts */}
       <SmartAlerts userEmail={user?.email} />
