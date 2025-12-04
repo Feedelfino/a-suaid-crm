@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { 
   Sparkles, RefreshCw, Copy, Mail, 
-  CheckCircle, Loader2, Zap, BookOpen, Send
+  CheckCircle, Loader2, Zap, BookOpen, Send,
+  Brain, Target, Lightbulb, Settings2
 } from 'lucide-react';
 import {
   Select,
@@ -24,22 +25,58 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Checkbox } from "@/components/ui/checkbox";
 
+// Contextos de e-mail
 const EMAIL_CONTEXTS = [
-  { value: 'primeiro_contato', label: 'Primeiro Contato', description: 'E-mail de apresentação inicial' },
-  { value: 'followup', label: 'Follow-up', description: 'Acompanhamento após contato' },
-  { value: 'proposta', label: 'Proposta Comercial', description: 'Envio de proposta formal' },
-  { value: 'nurturing', label: 'Nutrição', description: 'Conteúdo de valor para engajar' },
-  { value: 'reativacao', label: 'Reativação', description: 'Reengajar lead inativo' },
-  { value: 'agradecimento', label: 'Agradecimento', description: 'Pós-venda ou pós-reunião' },
-  { value: 'lembrete', label: 'Lembrete', description: 'Lembrar de reunião ou prazo' },
+  { value: 'primeiro_contato', label: 'Primeiro Contato', description: 'E-mail de apresentação inicial', icon: '👋' },
+  { value: 'followup', label: 'Follow-up', description: 'Acompanhamento após contato', icon: '🔄' },
+  { value: 'proposta', label: 'Proposta Comercial', description: 'Envio de proposta formal', icon: '📋' },
+  { value: 'nurturing', label: 'Nutrição', description: 'Conteúdo de valor para engajar', icon: '🌱' },
+  { value: 'reativacao', label: 'Reativação', description: 'Reengajar lead inativo', icon: '🔥' },
+  { value: 'agradecimento', label: 'Agradecimento', description: 'Pós-venda ou pós-reunião', icon: '🙏' },
+  { value: 'lembrete', label: 'Lembrete', description: 'Lembrar de reunião ou prazo', icon: '⏰' },
+  { value: 'objecao', label: 'Quebra de Objeção', description: 'Responder objeções por e-mail', icon: '💪' },
+  { value: 'case_sucesso', label: 'Case de Sucesso', description: 'Compartilhar história de cliente', icon: '🏆' },
 ];
 
+// Tons de comunicação
 const TONES = [
-  { value: 'profissional', label: 'Profissional' },
-  { value: 'amigavel', label: 'Amigável' },
-  { value: 'formal', label: 'Formal' },
-  { value: 'consultivo', label: 'Consultivo' },
+  { value: 'profissional', label: 'Profissional', description: 'Formal e corporativo' },
+  { value: 'amigavel', label: 'Amigável', description: 'Próximo e acolhedor' },
+  { value: 'formal', label: 'Formal', description: 'Muito formal e técnico' },
+  { value: 'consultivo', label: 'Consultivo', description: 'Especialista orientando' },
+  { value: 'empolgado', label: 'Empolgado', description: 'Entusiasmo controlado' },
+  { value: 'exclusivo', label: 'Exclusivo', description: 'VIP e personalizado' },
+];
+
+// Técnicas de persuasão
+const TECHNIQUES = [
+  { id: 'spin', label: 'SPIN Selling', description: 'Situação, Problema, Implicação, Necessidade', icon: Target },
+  { id: 'aida', label: 'AIDA', description: 'Atenção, Interesse, Desejo, Ação', icon: Target },
+  { id: 'pas', label: 'PAS', description: 'Problema, Agitação, Solução', icon: Target },
+  { id: 'pnl', label: 'PNL (Rapport)', description: 'Espelhamento e linguagem hipnótica', icon: Brain },
+  { id: 'storytelling', label: 'Storytelling', description: 'Narrativas envolventes', icon: BookOpen },
+  { id: 'copywriting', label: 'Copywriting Avançado', description: 'Headlines, hooks, CTAs irresistíveis', icon: Sparkles },
+  { id: 'gatilhos', label: 'Gatilhos Mentais', description: 'Escassez, autoridade, prova social', icon: Lightbulb },
+];
+
+// Gatilhos mentais específicos
+const MENTAL_TRIGGERS = [
+  { id: 'escassez', label: 'Escassez', description: 'Quantidade limitada', icon: '🔒' },
+  { id: 'urgencia', label: 'Urgência', description: 'Tempo limitado', icon: '⏰' },
+  { id: 'prova_social', label: 'Prova Social', description: 'Outros já compraram', icon: '👥' },
+  { id: 'autoridade', label: 'Autoridade', description: 'Especialista no assunto', icon: '🏆' },
+  { id: 'reciprocidade', label: 'Reciprocidade', description: 'Dar algo primeiro', icon: '🎁' },
+  { id: 'compromisso', label: 'Compromisso', description: 'Pequenos sim primeiro', icon: '✅' },
+  { id: 'afinidade', label: 'Afinidade', description: 'Conexão pessoal', icon: '❤️' },
+  { id: 'curiosidade', label: 'Curiosidade', description: 'Criar mistério', icon: '🔍' },
 ];
 
 export default function EmailAIAssistant({ 
@@ -54,11 +91,29 @@ export default function EmailAIAssistant({
   const [selectedContext, setSelectedContext] = useState('primeiro_contato');
   const [selectedTone, setSelectedTone] = useState('profissional');
   const [selectedProduct, setSelectedProduct] = useState('');
-  const [useStorytelling, setUseStorytelling] = useState(false);
+  const [selectedTechniques, setSelectedTechniques] = useState(['aida', 'copywriting']);
+  const [selectedTriggers, setSelectedTriggers] = useState(['prova_social', 'autoridade']);
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [previewEmail, setPreviewEmail] = useState(null);
   const [editedSubject, setEditedSubject] = useState('');
   const [editedBody, setEditedBody] = useState('');
+  const [customInstructions, setCustomInstructions] = useState('');
+  const [savedInstructions, setSavedInstructions] = useState('');
+
+  // Carregar instruções salvas do localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('email_ai_instructions');
+    if (saved) {
+      setSavedInstructions(saved);
+      setCustomInstructions(saved);
+    }
+  }, []);
+
+  // Salvar instruções personalizadas
+  const saveInstructions = () => {
+    localStorage.setItem('email_ai_instructions', customInstructions);
+    setSavedInstructions(customInstructions);
+  };
 
   // Buscar produtos disponíveis
   const { data: products = [] } = useQuery({
@@ -67,6 +122,22 @@ export default function EmailAIAssistant({
   });
 
   const selectedProductData = products.find(p => p.id === selectedProduct);
+
+  const toggleTechnique = (techId) => {
+    setSelectedTechniques(prev => 
+      prev.includes(techId) 
+        ? prev.filter(t => t !== techId)
+        : [...prev, techId]
+    );
+  };
+
+  const toggleTrigger = (triggerId) => {
+    setSelectedTriggers(prev => 
+      prev.includes(triggerId) 
+        ? prev.filter(t => t !== triggerId)
+        : [...prev, triggerId]
+    );
+  };
 
   const generateSuggestions = async () => {
     setIsGenerating(true);
@@ -80,6 +151,7 @@ export default function EmailAIAssistant({
         Status atual: ${client?.lead_status || 'novo'}
         Etapa do funil: ${client?.funnel_stage || 'lead'}
         Área de atuação: ${client?.business_area || 'Não informada'}
+        Origem: ${client?.lead_source || 'Não informada'}
       `;
 
       const productContext = selectedProductData ? `
@@ -94,17 +166,19 @@ export default function EmailAIAssistant({
         `- ${i.interaction_type}: ${i.notes || 'Sem observações'} (${i.tabulation || 'sem tabulação'})`
       ).join('\n');
 
-      const storytellingInstruction = useStorytelling ? `
-IMPORTANTE - USE STORYTELLING:
-- Comece o e-mail com uma história envolvente ou caso de sucesso real
-- Crie conexão emocional antes de apresentar a solução
-- Use narrativas que prendam a atenção desde a primeira linha
-- Conte histórias de transformação de clientes similares
-- Use frases como "Imagine...", "Há pouco tempo, um cliente como você...", "Deixe-me contar uma história..."
-- O storytelling deve fluir naturalmente no texto
-` : '';
+      // Técnicas selecionadas
+      const techniquesText = selectedTechniques.map(techId => {
+        const tech = TECHNIQUES.find(t => t.id === techId);
+        return tech ? `- ${tech.label}: ${tech.description}` : '';
+      }).filter(Boolean).join('\n');
 
-      const prompt = `Você é um especialista em copywriting para e-mails de vendas B2B.
+      // Gatilhos selecionados
+      const triggersText = selectedTriggers.map(triggerId => {
+        const trigger = MENTAL_TRIGGERS.find(t => t.id === triggerId);
+        return trigger ? `- ${trigger.label}: ${trigger.description}` : '';
+      }).filter(Boolean).join('\n');
+
+      const prompt = `Você é um MESTRE em copywriting de e-mails de vendas B2B, especializado em técnicas avançadas de persuasão.
 
 CONTEXTO DO CLIENTE:
 ${clientContext}
@@ -118,32 +192,91 @@ CAMPANHA: ${campaign?.name || 'Prospecção Geral'}
 
 OBJETIVO DO E-MAIL: ${EMAIL_CONTEXTS.find(c => c.value === selectedContext)?.description}
 TOM DESEJADO: ${selectedTone}
-${storytellingInstruction}
 
-Gere 3 sugestões de e-mails completos usando técnicas de:
-- SPIN Selling (Situação, Problema, Implicação, Necessidade)
-- AIDA (Atenção, Interesse, Desejo, Ação)
-- Gatilhos mentais (escassez, urgência, prova social, autoridade, reciprocidade)
-- PNL (rapport, linguagem persuasiva)
-${useStorytelling ? '- STORYTELLING (narrativas que capturam atenção e criam conexão emocional)' : ''}
+=== TÉCNICAS QUE VOCÊ DEVE USAR ===
+${techniquesText}
+
+=== GATILHOS MENTAIS PARA APLICAR ===
+${triggersText}
+
+=== INSTRUÇÕES ESPECÍFICAS DE COPYWRITING ===
+${selectedTechniques.includes('copywriting') ? `
+ASSUNTO DO E-MAIL (CRUCIAL - Taxa de abertura depende disso):
+- Use números específicos ("Como economizei R$15.000 em 30 dias")
+- Crie curiosidade ("O segredo que 97% dos empresários não conhecem")
+- Personalização com nome quando possível
+- Evite palavras spam (grátis, promoção, clique)
+- Use brackets [URGENTE] ou emojis com moderação
+- Máximo 50-60 caracteres
+- Teste variações: pergunta, declaração, número, curiosidade
+
+PRIMEIRA LINHA (Preview text):
+- Complementa o assunto
+- Gera ainda mais curiosidade
+- Faz a pessoa PRECISAR abrir
+
+CORPO DO E-MAIL:
+- Parágrafos curtos (2-3 linhas máx)
+- Use bullet points para benefícios
+- Destaque palavras importantes
+- CTA claro e específico
+- P.S. estratégico (muito lido!)
+` : ''}
+
+=== INSTRUÇÕES DE PNL ===
+${selectedTechniques.includes('pnl') ? `
+- Crie rapport usando linguagem do público-alvo
+- Use pressuposições positivas ("Quando você experimentar...")
+- Aplique comandos embutidos sutis
+- Palavras sensoriais (imagine, sinta, visualize)
+- Use "nós" para criar conexão
+- Espelhe valores e crenças do leitor
+` : ''}
+
+=== INSTRUÇÕES DE STORYTELLING ===
+${selectedTechniques.includes('storytelling') ? `
+- Comece com um gancho narrativo
+- Conte história de transformação (antes/depois)
+- Use casos de sucesso reais
+- Crie jornada do herói simplificada
+- Elementos emocionais e identificação
+- "Deixa eu te contar o que aconteceu com um cliente..."
+` : ''}
+
+=== ESTRUTURA PAS ===
+${selectedTechniques.includes('pas') ? `
+1. PROBLEMA: Identifique a dor do cliente
+2. AGITAÇÃO: Amplifique as consequências de não resolver
+3. SOLUÇÃO: Apresente sua solução como o caminho
+` : ''}
+
+${savedInstructions ? `
+=== INSTRUÇÕES PERSONALIZADAS DO USUÁRIO ===
+${savedInstructions}
+` : ''}
+
+GERE 3 E-MAILS DIFERENTES usando combinações criativas das técnicas.
+Cada e-mail deve ter abordagem e estilo ÚNICOS.
 
 Os e-mails devem ter:
-- ASSUNTO IMPACTANTE que gere curiosidade e aumente taxa de abertura
-- Primeira linha que PRENDA A ATENÇÃO imediatamente
+- ASSUNTO que gere ALTA taxa de abertura (máx 60 caracteres)
+- Primeira linha que PRENDA A ATENÇÃO
 - Corpo bem estruturado com parágrafos curtos
-- Benefícios claros do produto/serviço
-- Call-to-action claro e específico
-- Tom ${selectedTone} e profissional
-- Assinatura padrão: "Atenciosamente, [Nome do Agente] - A SUA.ID"
+- Benefícios claros com bullet points
+- Call-to-action específico e irresistível
+- P.S. estratégico quando apropriado
+- Assinatura: "Atenciosamente, [Nome do Agente] - A SUA.ID"
 
-Retorne em JSON com formato:
+Retorne em JSON:
 {
   "suggestions": [
     {
       "subject": "assunto do e-mail (máx 60 caracteres)",
-      "body": "corpo completo do e-mail",
+      "body": "corpo completo do e-mail formatado",
       "technique": "técnica principal utilizada",
-      "tip": "dica de quando usar este modelo"
+      "triggers_used": "gatilhos mentais aplicados",
+      "tip": "dica de quando usar",
+      "subject_analysis": "por que este assunto funciona"
     }
   ]
 }`;
@@ -161,7 +294,9 @@ Retorne em JSON com formato:
                   subject: { type: "string" },
                   body: { type: "string" },
                   technique: { type: "string" },
-                  tip: { type: "string" }
+                  triggers_used: { type: "string" },
+                  tip: { type: "string" },
+                  subject_analysis: { type: "string" }
                 }
               }
             }
@@ -174,22 +309,28 @@ Retorne em JSON com formato:
       console.error('Erro ao gerar sugestões:', error);
       setSuggestions([
         {
-          subject: `${client?.client_name?.split(' ')[0] || ''}, uma oportunidade especial para você`,
-          body: `Olá ${client?.client_name?.split(' ')[0] || ''}!\n\nEspero que esteja bem.\n\nEntro em contato porque acredito que podemos ajudar sua empresa a alcançar novos patamares.\n\nA A SUA.ID é especializada em soluções digitais que transformam a rotina empresarial, trazendo mais segurança, praticidade e economia de tempo.\n\nGostaria de agendar uma conversa rápida de 15 minutos para entender melhor suas necessidades?\n\nAguardo seu retorno!\n\nAtenciosamente,\n[Nome] - A SUA.ID`,
-          technique: "Abordagem consultiva",
-          tip: "Ideal para primeiro contato"
+          subject: `${client?.client_name?.split(' ')[0] || ''}, descobri algo que vai te interessar`,
+          body: `Olá ${client?.client_name?.split(' ')[0] || ''}!\n\nEspero que esteja bem.\n\nHá pouco tempo, ajudamos uma empresa do mesmo segmento que o seu a transformar completamente sua operação.\n\nEm apenas 3 meses, eles conseguiram:\n\n✅ Reduzir 40% dos custos operacionais\n✅ Economizar 15 horas semanais em processos\n✅ Aumentar a segurança dos dados\n\nAcredito que podemos fazer o mesmo pela sua empresa.\n\nQue tal agendarmos uma conversa de 15 minutos para eu mostrar como isso funcionaria para você?\n\nAtenciosamente,\n[Nome] - A SUA.ID\n\nP.S.: Temos apenas 3 vagas para novos clientes este mês.`,
+          technique: "Storytelling + Prova Social",
+          triggers_used: "Prova Social, Escassez",
+          tip: "Excelente para leads qualificados",
+          subject_analysis: "Personalização + Curiosidade"
         },
         {
-          subject: `Não deixe essa oportunidade passar - válido até sexta`,
-          body: `Olá ${client?.client_name?.split(' ')[0] || ''}!\n\nHá alguns dias conversamos sobre como podemos ajudar sua empresa.\n\nQuero te lembrar que temos uma condição especial válida até o final desta semana.\n\nMuitos empresários como você já estão aproveitando nossas soluções para:\n✅ Economizar tempo\n✅ Aumentar a segurança\n✅ Reduzir custos operacionais\n\nPosso te enviar uma proposta personalizada?\n\nAguardo seu retorno!\n\nAtenciosamente,\n[Nome] - A SUA.ID`,
-          technique: "Gatilho de escassez",
-          tip: "Bom para follow-up com urgência"
+          subject: `⏰ [Último dia] Condição especial expira hoje`,
+          body: `${client?.client_name?.split(' ')[0] || 'Olá'}!\n\nPreciso ser direto: a condição especial que te ofereci expira HOJE às 23h59.\n\nSei que você está ocupado, mas deixar passar essa oportunidade pode significar:\n\n❌ Continuar perdendo tempo com processos manuais\n❌ Manter custos operacionais elevados\n❌ Correr riscos desnecessários de segurança\n\nNão quero que isso aconteça com você.\n\nMe responde esse e-mail com "QUERO" e eu te ligo em 5 minutos para fecharmos juntos.\n\nAtenciosamente,\n[Nome] - A SUA.ID`,
+          technique: "PAS + Gatilho de Urgência",
+          triggers_used: "Urgência, Compromisso",
+          tip: "Ideal para follow-up com prazo",
+          subject_analysis: "Emoji + Urgência + Especificidade"
         },
         {
-          subject: `Como a [Empresa Similar] economizou 40% com nossa solução`,
-          body: `Olá ${client?.client_name?.split(' ')[0] || ''}!\n\nRecentemente, ajudamos uma empresa do mesmo segmento que o seu a transformar completamente sua operação.\n\nEm apenas 3 meses, eles conseguiram:\n📈 Reduzir 40% dos custos operacionais\n⏱️ Economizar 15 horas semanais em processos\n🔒 Aumentar a segurança dos dados\n\nAcredito que podemos fazer o mesmo pela sua empresa.\n\nQue tal agendarmos uma conversa para eu mostrar como isso funcionaria para você?\n\nAtenciosamente,\n[Nome] - A SUA.ID`,
-          technique: "Prova social + Storytelling",
-          tip: "Excelente para leads qualificados"
+          subject: `Como a [Empresa X] economizou R$15.000 em 6 meses`,
+          body: `Olá ${client?.client_name?.split(' ')[0] || ''}!\n\nQuero compartilhar uma história rápida com você.\n\nHá 6 meses, conheci o João, dono de uma empresa parecida com a sua. Ele estava frustrado com:\n\n• Processos burocráticos lentos\n• Custos operacionais altos\n• Medo de problemas de segurança\n\nHoje, a empresa dele:\n\n✨ Economiza R$15.000/ano em processos\n✨ Reduziu 70% do tempo em burocracia\n✨ Opera com total segurança digital\n\nA diferença? Uma única decisão: implementar nossas soluções.\n\nPosso te mostrar exatamente como replicar esse resultado?\n\nAtenciosamente,\n[Nome] - A SUA.ID`,
+          technique: "Storytelling + SPIN",
+          triggers_used: "Prova Social, Autoridade",
+          tip: "Perfeito para nutrição de leads",
+          subject_analysis: "Número específico + Resultado tangível"
         }
       ]);
     } finally {
@@ -231,79 +372,178 @@ Retorne em JSON com formato:
             </div>
             Assistente IA - E-mail
             <Badge className="bg-blue-100 text-blue-700 ml-auto">
-              <Sparkles className="w-3 h-3 mr-1" /> IA
+              <Sparkles className="w-3 h-3 mr-1" /> IA Avançada
             </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Configurações */}
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-slate-600 mb-1 block">Tipo de E-mail</label>
-                <Select value={selectedContext} onValueChange={setSelectedContext}>
-                  <SelectTrigger className="bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {EMAIL_CONTEXTS.map(ctx => (
-                      <SelectItem key={ctx.value} value={ctx.value}>
-                        {ctx.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs text-slate-600 mb-1 block">Tom</label>
-                <Select value={selectedTone} onValueChange={setSelectedTone}>
-                  <SelectTrigger className="bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TONES.map(tone => (
-                      <SelectItem key={tone.value} value={tone.value}>
-                        {tone.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Seleção de Produto */}
+          {/* Configurações Básicas */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-slate-600 mb-1 block">Produto (para contextualizar)</label>
-              <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+              <label className="text-xs text-slate-600 mb-1 block">Tipo de E-mail</label>
+              <Select value={selectedContext} onValueChange={setSelectedContext}>
                 <SelectTrigger className="bg-white">
-                  <SelectValue placeholder="Selecione um produto..." />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={null}>Nenhum (genérico)</SelectItem>
-                  {products.map(product => (
-                    <SelectItem key={product.id} value={product.id}>
-                      {product.name} {product.price ? `- R$ ${product.price.toLocaleString('pt-BR')}` : ''}
+                  {EMAIL_CONTEXTS.map(ctx => (
+                    <SelectItem key={ctx.value} value={ctx.value}>
+                      <span className="flex items-center gap-2">
+                        <span>{ctx.icon}</span> {ctx.label}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Toggle Storytelling */}
-            <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-blue-600" />
-                <div>
-                  <Label className="text-sm font-medium">Usar Storytelling</Label>
-                  <p className="text-xs text-slate-500">Histórias envolventes que criam conexão</p>
-                </div>
-              </div>
-              <Switch
-                checked={useStorytelling}
-                onCheckedChange={setUseStorytelling}
-              />
+            <div>
+              <label className="text-xs text-slate-600 mb-1 block">Tom</label>
+              <Select value={selectedTone} onValueChange={setSelectedTone}>
+                <SelectTrigger className="bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TONES.map(tone => (
+                    <SelectItem key={tone.value} value={tone.value}>
+                      {tone.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
+
+          {/* Seleção de Produto */}
+          <div>
+            <label className="text-xs text-slate-600 mb-1 block">Produto</label>
+            <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+              <SelectTrigger className="bg-white">
+                <SelectValue placeholder="Selecione um produto..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={null}>Nenhum (genérico)</SelectItem>
+                {products.map(product => (
+                  <SelectItem key={product.id} value={product.id}>
+                    {product.name} {product.price ? `- R$ ${product.price.toLocaleString('pt-BR')}` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Accordion para Configurações Avançadas */}
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="techniques" className="border rounded-lg bg-white">
+              <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                <span className="flex items-center gap-2 text-sm">
+                  <Brain className="w-4 h-4 text-blue-600" />
+                  Técnicas de Persuasão
+                  <Badge variant="secondary" className="ml-2">{selectedTechniques.length}</Badge>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="px-3 pb-3">
+                <div className="grid grid-cols-2 gap-2">
+                  {TECHNIQUES.map(tech => (
+                    <label
+                      key={tech.id}
+                      className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
+                        selectedTechniques.includes(tech.id) 
+                          ? 'bg-blue-50 border-blue-300' 
+                          : 'bg-white border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Checkbox
+                        checked={selectedTechniques.includes(tech.id)}
+                        onCheckedChange={() => toggleTechnique(tech.id)}
+                      />
+                      <div>
+                        <p className="text-sm font-medium flex items-center gap-1">
+                          <tech.icon className="w-3 h-3" /> {tech.label}
+                        </p>
+                        <p className="text-xs text-slate-500">{tech.description}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="triggers" className="border rounded-lg bg-white mt-2">
+              <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                <span className="flex items-center gap-2 text-sm">
+                  <Lightbulb className="w-4 h-4 text-amber-600" />
+                  Gatilhos Mentais
+                  <Badge variant="secondary" className="ml-2">{selectedTriggers.length}</Badge>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="px-3 pb-3">
+                <div className="grid grid-cols-2 gap-2">
+                  {MENTAL_TRIGGERS.map(trigger => (
+                    <label
+                      key={trigger.id}
+                      className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
+                        selectedTriggers.includes(trigger.id) 
+                          ? 'bg-amber-50 border-amber-300' 
+                          : 'bg-white border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Checkbox
+                        checked={selectedTriggers.includes(trigger.id)}
+                        onCheckedChange={() => toggleTrigger(trigger.id)}
+                      />
+                      <span className="text-sm">
+                        {trigger.icon} {trigger.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="custom" className="border rounded-lg bg-white mt-2">
+              <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                <span className="flex items-center gap-2 text-sm">
+                  <Settings2 className="w-4 h-4 text-purple-600" />
+                  Ensinar a IA (Instruções Personalizadas)
+                  {savedInstructions && <Badge className="bg-purple-100 text-purple-700 ml-2">Configurado</Badge>}
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="px-3 pb-3 space-y-3">
+                <p className="text-xs text-slate-500">
+                  Ensine a IA como você gostaria que ela escreva e-mails. Suas instruções serão lembradas.
+                </p>
+                <Textarea
+                  placeholder="Ex: Sempre mencione que somos parceiros oficiais. Use tom mais informal com startups. Inclua sempre um link para agendar reunião. Evite e-mails muito longos..."
+                  value={customInstructions}
+                  onChange={(e) => setCustomInstructions(e.target.value)}
+                  className="min-h-[100px] text-sm"
+                />
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={saveInstructions}
+                    className="flex-1"
+                  >
+                    💾 Salvar Instruções
+                  </Button>
+                  {savedInstructions && (
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      onClick={() => {
+                        setCustomInstructions('');
+                        setSavedInstructions('');
+                        localStorage.removeItem('email_ai_instructions');
+                      }}
+                    >
+                      Limpar
+                    </Button>
+                  )}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
 
           {/* Botão de Gerar */}
           <Button 
@@ -314,12 +554,12 @@ Retorne em JSON com formato:
             {isGenerating ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Gerando sugestões...
+                Criando e-mails persuasivos...
               </>
             ) : (
               <>
                 <Zap className="w-4 h-4 mr-2" />
-                Gerar Sugestões de E-mail
+                Gerar E-mails Avançados
               </>
             )}
           </Button>
@@ -327,16 +567,21 @@ Retorne em JSON com formato:
           {/* Sugestões */}
           {suggestions.length > 0 && (
             <div className="space-y-3">
-              <p className="text-sm font-medium text-slate-700">E-mails Sugeridos:</p>
+              <p className="text-sm font-medium text-slate-700">E-mails Gerados:</p>
               {suggestions.map((suggestion, index) => (
                 <div 
                   key={index}
                   className="p-4 bg-white rounded-xl border border-blue-100 hover:border-blue-300 transition-all"
                 >
-                  <div className="flex items-start gap-2 mb-2">
-                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
                       {suggestion.technique}
                     </Badge>
+                    {suggestion.triggers_used && (
+                      <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700">
+                        {suggestion.triggers_used}
+                      </Badge>
+                    )}
                   </div>
                   
                   {/* Assunto */}
@@ -357,6 +602,11 @@ Retorne em JSON com formato:
                         )}
                       </Button>
                     </div>
+                    {suggestion.subject_analysis && (
+                      <p className="text-xs text-purple-600 mt-1 italic">
+                        ✨ {suggestion.subject_analysis}
+                      </p>
+                    )}
                   </div>
 
                   {/* Preview do corpo */}
@@ -368,7 +618,7 @@ Retorne em JSON com formato:
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-slate-500 italic">💡 {suggestion.tip}</p>
+                    <p className="text-xs text-slate-500">💡 {suggestion.tip}</p>
                     <div className="flex gap-2">
                       <Button
                         size="sm"
@@ -412,7 +662,7 @@ Retorne em JSON com formato:
               className="w-full"
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
-              Gerar Novas Sugestões
+              Gerar Novas Variações
             </Button>
           )}
         </CardContent>
