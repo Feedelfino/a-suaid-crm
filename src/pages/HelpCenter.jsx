@@ -30,6 +30,7 @@ const SUBCATEGORIES = {
     { id: 'agenda', name: 'Agenda', icon: Calendar },
     { id: 'campanhas', name: 'Campanhas', icon: Target },
     { id: 'notas', name: 'Notas', icon: StickyNote },
+    { id: 'importacao', name: 'Importação de Dados', icon: FileText },
     { id: 'admin', name: 'Administração', icon: Settings },
   ],
   faq: [
@@ -40,6 +41,7 @@ const SUBCATEGORIES = {
     { id: 'campanhas', name: 'Campanhas' },
     { id: 'interacoes', name: 'Interações' },
     { id: 'metas', name: 'Metas' },
+    { id: 'importacao', name: 'Importação' },
   ],
 };
 
@@ -140,6 +142,112 @@ Clique em **Registrar** para salvar.
 > 💡 A interação movimentará automaticamente o cliente no funil!`,
     order: 1,
     tags: ['tutorial', 'interacao', 'primeiro', 'basico']
+  },
+  {
+    category: 'modulos',
+    subcategory: 'importacao',
+    title: 'Importação de Dados - Formatos e Requisitos',
+    content: `# Importação de Dados
+
+O módulo de Banco de Dados permite importar planilhas de clientes e certificados digitais.
+
+## Formatos Suportados
+
+| Formato | Extensão | Tamanho Máx. | Observações |
+|---------|----------|--------------|-------------|
+| Excel | .xlsx | 10MB | Versões modernas (2007+) |
+| Excel Antigo | .xls | 10MB | Excel 97-2003 |
+| CSV | .csv | 5MB | Separador: vírgula (,) ou ponto-e-vírgula (;) |
+| PDF | .pdf | 15MB | Tabelas bem formatadas |
+
+## Estrutura do Arquivo
+
+A **primeira linha** deve conter os cabeçalhos das colunas. As colunas aceitas são:
+
+### Colunas Obrigatórias
+- **NOME** - Nome completo do titular
+
+### Colunas Opcionais
+- **PRODUTO** - Tipo de certificado (ex: e-CPF A3 36 MESES)
+- **CNPJ** - CNPJ da empresa (apenas números ou formatado)
+- **CPF** - CPF do titular (apenas números ou formatado)
+- **TELEFONE** - Número de contato
+- **EMAIL** - E-mail do cliente
+- **DT_EMIS** - Data de emissão (para renovações)
+- **DT_FIM** - Data de vencimento (para renovações)
+
+> ⚠️ As colunas podem estar em **qualquer ordem**.
+
+## Exemplo de Arquivo CSV
+
+\`\`\`
+PRODUTO;CNPJ;CPF;NOME;TELEFONE;EMAIL;DT_EMIS;DT_FIM
+e-CPF A3 36 MESES;;12345678901;MARIA DA SILVA;11999998888;maria@email.com;01/01/2024;01/01/2027
+e-CNPJ A3 36 MESES;12345678000199;98765432100;JOAO SANTOS;11988887777;joao@empresa.com;15/06/2024;15/06/2027
+\`\`\`
+
+## Baixar Modelo
+
+Na tela de importação, clique em **"Baixar Modelo CSV"** para obter um arquivo de exemplo pronto para preencher.
+
+## Detecção de Duplicados
+
+O sistema verifica automaticamente:
+1. **Duplicados na planilha** - Linhas repetidas no mesmo arquivo
+2. **Duplicados no sistema** - Dados que já existem no CRM
+
+A verificação é feita por:
+- CPF
+- CNPJ
+- E-mail
+- Telefone
+
+## Formatos de Data Aceitos
+
+- DD/MM/AAAA (ex: 01/01/2024)
+- AAAA-MM-DD (ex: 2024-01-01)
+
+## Dicas Importantes
+
+✅ Certifique-se que a primeira linha contém os cabeçalhos
+✅ Use UTF-8 como codificação para caracteres especiais
+✅ Para CSV, o separador pode ser vírgula ou ponto-e-vírgula
+✅ Remova linhas em branco antes de importar
+✅ Verifique os alertas de duplicados antes de confirmar`,
+    order: 5,
+    tags: ['importacao', 'planilha', 'excel', 'csv', 'pdf', 'upload', 'dados', 'certificados']
+  },
+  {
+    category: 'faq',
+    subcategory: 'importacao',
+    title: 'Erros comuns na importação de dados',
+    content: `# Erros Comuns na Importação
+
+## Arquivo muito grande
+**Erro:** "Arquivo muito grande"
+**Solução:** O tamanho máximo é 15MB. Divida o arquivo em partes menores.
+
+## Formato não suportado
+**Erro:** "Formato não suportado"
+**Solução:** Use apenas: .xlsx, .xls, .csv ou .pdf
+
+## Colunas não reconhecidas
+**Erro:** Dados não são mapeados corretamente
+**Solução:** Verifique se a primeira linha contém os nomes das colunas exatamente como esperado (PRODUTO, CNPJ, CPF, NOME, TELEFONE, EMAIL, DT_EMIS, DT_FIM).
+
+## Codificação de caracteres
+**Erro:** Caracteres estranhos no nome (ex: Ã©)
+**Solução:** Salve o CSV com codificação UTF-8.
+
+## Duplicados detectados
+**Aviso:** "X registros já existem no sistema"
+**Solução:** Revise os registros marcados em laranja e remova-os antes de importar, ou prossiga se quiser criar duplicados.
+
+## PDF não reconhecido
+**Erro:** Dados não extraídos do PDF
+**Solução:** O PDF deve ter uma tabela clara e bem formatada. PDFs escaneados ou com layout complexo podem não funcionar. Prefira Excel ou CSV.`,
+    order: 10,
+    tags: ['erro', 'importacao', 'problema', 'solucao', 'faq']
   },
 ];
 
