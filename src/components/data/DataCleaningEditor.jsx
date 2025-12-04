@@ -33,7 +33,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
-export default function DataCleaningEditor({ data, columns, onDataChange, onImport }) {
+export default function DataCleaningEditor({ data, columns, onDataChange, onImport, existingClients = [], duplicatesInSystem = [] }) {
   const [editingRow, setEditingRow] = useState(null);
   const [editingData, setEditingData] = useState({});
   const [selectedRows, setSelectedRows] = useState([]);
@@ -150,17 +150,38 @@ export default function DataCleaningEditor({ data, columns, onDataChange, onImpo
     }
   };
 
-  // Remover duplicatas
+  // Verificar se linha é duplicado no sistema
+  const isSystemDuplicate = (index) => {
+    return duplicatesInSystem.some(d => d.rowIndex === index);
+  };
+
+  const getSystemDuplicateInfo = (index) => {
+    return duplicatesInSystem.find(d => d.rowIndex === index);
+  };
+
+  // Remover duplicatas (na planilha)
   const removeDuplicates = () => {
     const seen = new Set();
     const uniqueData = data.filter(row => {
-      // Criar chave única baseada em email ou telefone ou nome
-      const key = `${row.email || row.Email || ''}-${row.phone || row.telefone || ''}-${row.client_name || row.nome || ''}`.toLowerCase();
+      // Criar chave única baseada em cpf, cnpj, email, telefone ou nome
+      const cpf = String(row.cpf || row.CPF || '').replace(/\D/g, '');
+      const cnpj = String(row.cnpj || row.CNPJ || '').replace(/\D/g, '');
+      const email = String(row.email || row.EMAIL || '').toLowerCase().trim();
+      const phone = String(row.telefone || row.phone || row.TELEFONE || '').replace(/\D/g, '');
+      const nome = String(row.nome || row.client_name || row.NOME || '').toLowerCase().trim();
+      
+      const key = `${cpf}-${cnpj}-${email}-${phone.slice(-8)}-${nome}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
     onDataChange(uniqueData);
+  };
+
+  // Remover duplicados que já existem no sistema
+  const removeSystemDuplicates = () => {
+    const newData = data.filter((_, index) => !isSystemDuplicate(index));
+    onDataChange(newData);
   };
 
   // Remover linhas com campos vazios
@@ -290,8 +311,14 @@ Retorne os dados limpos no mesmo formato JSON.`,
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={removeDuplicates}>
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Remover Duplicatas
+                Remover Duplicatas na Planilha
               </DropdownMenuItem>
+              {duplicatesInSystem.length > 0 && (
+                <DropdownMenuItem onClick={removeSystemDuplicates} className="text-amber-600">
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  Remover Duplicados do Sistema ({duplicatesInSystem.length})
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={removeEmptyRows}>
                 <Trash2 className="w-4 h-4 mr-2" />
                 Remover Linhas Vazias
@@ -322,7 +349,7 @@ Retorne os dados limpos no mesmo formato JSON.`,
       </div>
 
       {/* Stats */}
-      <div className="flex gap-4 text-sm">
+      <div className="flex gap-4 text-sm flex-wrap">
         <Badge variant="secondary">{data.length} registros</Badge>
         <Badge variant="secondary">{filteredData.length} exibidos</Badge>
         {selectedRows.length > 0 && (
@@ -331,6 +358,11 @@ Retorne os dados limpos no mesmo formato JSON.`,
         <Badge variant="outline">
           {data.filter(row => detectIssues(row).length > 0).length} com problemas
         </Badge>
+        {duplicatesInSystem.length > 0 && (
+          <Badge className="bg-orange-100 text-orange-700">
+            {duplicatesInSystem.length} duplicados no sistema
+          </Badge>
+        )}
       </div>
 
       {/* Table */}
@@ -361,7 +393,7 @@ Retorne os dados limpos no mesmo formato JSON.`,
                 const isEditing = editingRow === index;
                 
                 return (
-                  <TableRow key={index} className={issues.length > 0 ? 'bg-amber-50' : ''}>
+                  <TableRow key={index} className={`${issues.length > 0 ? 'bg-amber-50' : ''} ${isSystemDuplicate(index) ? 'bg-orange-100 border-l-4 border-l-orange-500' : ''}`}>
                     <TableCell>
                       <Checkbox 
                         checked={selectedRows.includes(index)}
@@ -388,17 +420,25 @@ Retorne os dados limpos no mesmo formato JSON.`,
                       </TableCell>
                     ))}
                     <TableCell>
-                      {issues.length > 0 ? (
-                        <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs">
-                          <AlertTriangle className="w-3 h-3 mr-1" />
-                          {issues.length}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-green-600 border-green-300 text-xs">
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          OK
-                        </Badge>
-                      )}
+                      <div className="flex flex-col gap-1">
+                        {isSystemDuplicate(index) && (
+                          <Badge className="bg-orange-100 text-orange-700 text-xs">
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                            Existe no sistema
+                          </Badge>
+                        )}
+                        {issues.length > 0 ? (
+                          <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs">
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                            {issues.length} problema(s)
+                          </Badge>
+                        ) : !isSystemDuplicate(index) && (
+                          <Badge variant="outline" className="text-green-600 border-green-300 text-xs">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            OK
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {isEditing ? (
