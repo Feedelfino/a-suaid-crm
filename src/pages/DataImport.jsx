@@ -21,6 +21,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import DataCleaningEditor from '@/components/data/DataCleaningEditor';
+import { Download } from 'lucide-react';
 
 // Formatos suportados com detalhes
 const SUPPORTED_FORMATS = [
@@ -72,6 +73,35 @@ const EXPECTED_COLUMNS = {
 };
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
+
+// Gerar CSV modelo para download
+const generateTemplateCSV = () => {
+  const headers = ['PRODUTO', 'CNPJ', 'CPF', 'NOME', 'TELEFONE', 'EMAIL', 'DT_EMIS', 'DT_FIM'];
+  const exampleRows = [
+    ['e-CPF A3 36 MESES', '', '12345678901', 'MARIA DA SILVA', '11999998888', 'maria@email.com', '01/01/2024', '01/01/2027'],
+    ['e-CNPJ A3 36 MESES', '12345678000199', '98765432100', 'JOAO SANTOS', '11988887777', 'joao@empresa.com', '15/06/2024', '15/06/2027'],
+  ];
+  
+  const csvContent = [
+    headers.join(';'),
+    ...exampleRows.map(row => row.join(';'))
+  ].join('\n');
+  
+  return csvContent;
+};
+
+const downloadTemplate = () => {
+  const csv = generateTemplateCSV();
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'modelo_importacao_certificados.csv';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 
 export default function DataImport() {
   const queryClient = useQueryClient();
@@ -195,30 +225,38 @@ export default function DataImport() {
       // Upload file
       const { file_url } = await base44.integrations.Core.UploadFile({ file: selectedFile });
       
-      // Extract data com schema flexível baseado no exemplo fornecido
+      // Extract data com schema correto (root deve ser objeto)
       const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
         file_url,
         json_schema: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              produto: { type: "string", description: "PRODUTO, tipo de certificado digital" },
-              cnpj: { type: "string", description: "CNPJ da empresa" },
-              cpf: { type: "string", description: "CPF do titular" },
-              nome: { type: "string", description: "NOME DO TITULAR, nome completo" },
-              telefone: { type: "string", description: "TELEFONE, celular" },
-              email: { type: "string", description: "EMAIL, e-mail" },
-              unid_atendimento: { type: "string", description: "UNID_ATENDIMENTO, local de atendimento" },
-              dt_emis: { type: "string", description: "DT_EMIS, data de emissão" },
-              dt_fim: { type: "string", description: "DT_FIM, data de vencimento" },
+          type: "object",
+          properties: {
+            registros: {
+              type: "array",
+              description: "Lista de registros extraídos do arquivo",
+              items: {
+                type: "object",
+                properties: {
+                  produto: { type: "string", description: "PRODUTO, tipo de certificado digital" },
+                  cnpj: { type: "string", description: "CNPJ da empresa" },
+                  cpf: { type: "string", description: "CPF do titular" },
+                  nome: { type: "string", description: "NOME DO TITULAR, nome completo" },
+                  telefone: { type: "string", description: "TELEFONE, celular" },
+                  email: { type: "string", description: "EMAIL, e-mail" },
+                  unid_atendimento: { type: "string", description: "UNID_ATENDIMENTO, local de atendimento" },
+                  dt_emis: { type: "string", description: "DT_EMIS, data de emissão" },
+                  dt_fim: { type: "string", description: "DT_FIM, data de vencimento" },
+                }
+              }
             }
           }
         }
       });
 
       if (result.status === 'success' && result.output) {
-        const dataArray = Array.isArray(result.output) ? result.output : [result.output];
+        // Extrair array de registros do objeto retornado
+        const rawData = result.output.registros || result.output;
+        const dataArray = Array.isArray(rawData) ? rawData : [rawData];
         
         // Normalizar dados
         const normalizedData = dataArray.map(row => {
@@ -475,7 +513,7 @@ export default function DataImport() {
                     </p>
                     
                     {/* Formatos Suportados */}
-                    <div className="flex flex-wrap justify-center gap-3">
+                    <div className="flex flex-wrap justify-center gap-3 mb-6">
                       {SUPPORTED_FORMATS.map(format => (
                         <div key={format.ext} className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg">
                           <format.icon className={`w-5 h-5 ${format.color}`} />
@@ -486,6 +524,16 @@ export default function DataImport() {
                         </div>
                       ))}
                     </div>
+
+                    {/* Botão Download Modelo */}
+                    <Button 
+                      variant="outline" 
+                      onClick={downloadTemplate}
+                      className="border-[#6B2D8B] text-[#6B2D8B] hover:bg-[#6B2D8B]/5"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Baixar Modelo CSV
+                    </Button>
                   </>
                 )}
               </label>
