@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Save, Calendar, User, Video, Phone, MapPin, Building2, Users, Briefcase, Link2 } from 'lucide-react';
+import { ArrowLeft, Save, Calendar, User, Video, Phone, MapPin, Building2, Users, Briefcase, Link2, RefreshCw, ExternalLink } from 'lucide-react';
 import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,7 @@ export default function AppointmentForm() {
   
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [user, setUser] = useState(null);
   const { getDisplayName, accessRecords } = useUserDisplayName();
 
@@ -206,6 +207,41 @@ export default function AppointmentForm() {
         ? prev.participants.filter(e => e !== email)
         : [...(prev.participants || []), email]
     }));
+  };
+
+  const handleGoogleCalendarSync = async () => {
+    if (!appointmentId) {
+      alert('Salve o compromisso primeiro antes de sincronizar com Google Calendar');
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const response = await base44.functions.invoke('googleCalendarSync', {
+        appointmentId,
+        action: formData.google_event_id ? 'update' : 'create',
+      });
+
+      if (response.data.success) {
+        // Atualizar dados locais
+        setFormData(prev => ({
+          ...prev,
+          google_event_id: response.data.google_event_id || prev.google_event_id,
+          google_meet_link: response.data.google_meet_link || prev.google_meet_link,
+          meeting_link: response.data.google_meet_link || prev.meeting_link,
+        }));
+        alert(formData.google_event_id ? 'Evento atualizado no Google Calendar!' : 'Evento criado no Google Calendar com sucesso!');
+        // Recarregar dados
+        await loadAppointment();
+      } else {
+        alert('Erro: ' + (response.data.error || 'Erro desconhecido'));
+      }
+    } catch (error) {
+      console.error('Erro ao sincronizar:', error);
+      alert('Erro ao sincronizar com Google Calendar. Verifique se você autorizou o acesso.');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -628,17 +664,38 @@ export default function AppointmentForm() {
               {formData.appointment_type === 'videoconferencia' && (
                 <div className="space-y-2 md:col-span-2">
                   <Label className="flex items-center gap-2">
-                    <Link2 className="w-4 h-4" />
+                    <Video className="w-4 h-4" />
                     Link da Videochamada
                   </Label>
-                  <Input
-                    value={formData.meeting_link}
-                    onChange={(e) => handleChange('meeting_link', e.target.value)}
-                    placeholder="https://meet.google.com/..."
-                  />
-                  <p className="text-xs text-slate-500">
-                    Cole o link do Google Meet, Zoom ou outra plataforma
-                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      value={formData.google_meet_link || formData.meeting_link}
+                      onChange={(e) => handleChange('meeting_link', e.target.value)}
+                      placeholder="https://meet.google.com/..."
+                      readOnly={!!formData.google_meet_link}
+                      className={formData.google_meet_link ? 'bg-green-50 border-green-300' : ''}
+                    />
+                    {formData.google_meet_link && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => window.open(formData.google_meet_link, '_blank')}
+                        className="shrink-0"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {formData.google_meet_link ? (
+                    <p className="text-xs text-green-600 flex items-center gap-1">
+                      ✅ Link do Google Meet gerado automaticamente
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-500">
+                      Sincronize com Google Calendar para gerar automaticamente
+                    </p>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -689,6 +746,61 @@ export default function AppointmentForm() {
               />
             </CardContent>
           </Card>
+
+          {/* Google Calendar Sync */}
+          {appointmentId && (
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-indigo-50">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2 text-blue-800">
+                  <Calendar className="w-5 h-5" />
+                  Integração Google Calendar
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1">
+                    <p className="text-sm text-slate-700 mb-1">
+                      {formData.google_event_id ? (
+                        <span className="flex items-center gap-2 text-green-600">
+                          ✅ Sincronizado com Google Calendar
+                        </span>
+                      ) : (
+                        'Sincronize este compromisso com seu Google Calendar'
+                      )}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {formData.google_event_id ? 
+                        'O evento está no seu calendário. Clique para atualizar.' : 
+                        'Cria automaticamente o evento e gera link do Google Meet (se videoconferência)'}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleGoogleCalendarSync}
+                    disabled={isSyncing}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {isSyncing ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Sincronizando...
+                      </>
+                    ) : formData.google_event_id ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Atualizar
+                      </>
+                    ) : (
+                      <>
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Sincronizar
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end gap-4">
