@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { base44 } from '@/api/base44Client';
 import { 
   Phone, Video, MapPin, MoreVertical, Edit, Trash2,
-  Users, Building2, Briefcase
+  Users, Building2, Briefcase, Mail, ExternalLink
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 const statusColors = {
@@ -37,6 +39,49 @@ const categoryColors = {
 export default function AppointmentCard({ apt, compact = false, onDelete, getDisplayName }) {
   const Icon = typeIcons[apt.appointment_type] || Phone;
   const isInternal = apt.category === 'interno';
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
+  const handleSendEmail = async () => {
+    setIsSendingEmail(true);
+    try {
+      const recipients = [];
+      if (apt.email) recipients.push(apt.email);
+      if (apt.participants?.length) recipients.push(...apt.participants);
+      if (apt.agent_email) recipients.push(apt.agent_email);
+
+      const uniqueRecipients = [...new Set(recipients)];
+
+      for (const recipient of uniqueRecipients) {
+        await base44.integrations.Core.SendEmail({
+          to: recipient,
+          subject: `Reunião: ${apt.title}`,
+          body: `
+            <h2>Detalhes da Reunião</h2>
+            <p><strong>Título:</strong> ${apt.title}</p>
+            <p><strong>Data:</strong> ${new Date(apt.date).toLocaleDateString('pt-BR')}</p>
+            <p><strong>Horário:</strong> ${apt.time}</p>
+            <p><strong>Duração:</strong> ${apt.duration || 30} minutos</p>
+            ${apt.description ? `<p><strong>Descrição:</strong> ${apt.description}</p>` : ''}
+            ${apt.google_meet_link ? `<p><strong>Link Google Meet:</strong> <a href="${apt.google_meet_link}">${apt.google_meet_link}</a></p>` : ''}
+            ${apt.location ? `<p><strong>Local:</strong> ${apt.location}</p>` : ''}
+          `
+        });
+      }
+      alert('E-mails enviados com sucesso!');
+    } catch (error) {
+      alert('Erro ao enviar e-mails: ' + error.message);
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  const handleOpenMeet = () => {
+    if (apt.google_meet_link) {
+      window.open(apt.google_meet_link, '_blank');
+    } else if (apt.meeting_link) {
+      window.open(apt.meeting_link, '_blank');
+    }
+  };
   
   return (
     <div 
@@ -92,6 +137,18 @@ export default function AppointmentCard({ apt, compact = false, onDelete, getDis
                 Editar
               </DropdownMenuItem>
             </Link>
+            <DropdownMenuSeparator />
+            {(apt.google_meet_link || apt.meeting_link) && (
+              <DropdownMenuItem onClick={handleOpenMeet}>
+                <ExternalLink className="w-4 h-4 mr-2 text-blue-600" />
+                Abrir Google Meet
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={handleSendEmail} disabled={isSendingEmail}>
+              <Mail className="w-4 h-4 mr-2 text-green-600" />
+              {isSendingEmail ? 'Enviando...' : 'Enviar E-mail aos Participantes'}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem 
               className="text-red-600"
               onClick={() => onDelete && onDelete(apt.id)}
