@@ -50,6 +50,8 @@ export default function Schedule() {
     loadUser();
   }, []);
 
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['appointments'],
     queryFn: () => base44.entities.Appointment.list('-date', 500),
@@ -79,8 +81,6 @@ export default function Schedule() {
     mutationFn: (id) => base44.entities.Appointment.delete(id),
     onSuccess: () => queryClient.invalidateQueries(['appointments']),
   });
-
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   // Aplicar filtros
