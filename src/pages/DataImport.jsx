@@ -327,6 +327,22 @@ export default function DataImport() {
       // Determinar se é importação de certificados (tem dt_emis e dt_fim)
       const hasCertificateData = validRecords.some(r => r.dt_emis || r.dt_fim || r.produto);
 
+      // Buscar ou criar campanha de renovação se tiver dados de certificado
+      let renovationCampaign;
+      if (hasCertificateData) {
+        const campaigns = await base44.entities.Campaign.filter({ name: 'Renovação de Certificados' });
+        if (campaigns.length === 0) {
+          renovationCampaign = await base44.entities.Campaign.create({
+            name: 'Renovação de Certificados',
+            description: 'Campanha automática para renovação de certificados digitais',
+            status: 'ativa',
+            start_date: new Date().toISOString().split('T')[0],
+          });
+        } else {
+          renovationCampaign = campaigns[0];
+        }
+      }
+
       let imported = 0;
       const batchSize = 10;
       
@@ -334,22 +350,44 @@ export default function DataImport() {
         const batch = validRecords.slice(i, i + batchSize);
         
         await Promise.all(batch.map(async (record) => {
-          // Criar cliente
+          const cpf = String(record.cpf || '').replace(/\D/g, '');
+          const cnpj = String(record.cnpj || '').replace(/\D/g, '');
+          
+          // Verificar se cliente já existe por CPF ou CNPJ
+          let existingClient = null;
+          if (cpf) {
+            const clients = await base44.entities.Client.filter({ cpf });
+            if (clients.length > 0) existingClient = clients[0];
+          }
+          if (!existingClient && cnpj) {
+            const clients = await base44.entities.Client.filter({ cnpj });
+            if (clients.length > 0) existingClient = clients[0];
+          }
+
+          // Criar ou atualizar cliente
           const clientData = {
             client_name: record.nome || record.name || 'Sem nome',
             company_name: record.empresa || '',
             email: record.email || '',
             phone: record.telefone || record.phone || '',
-            cpf: record.cpf || '',
-            cnpj: record.cnpj || '',
+            cpf: cpf || '',
+            cnpj: cnpj || '',
             business_area: record.produto || '',
             notes: [record.unid_atendimento, record.observacoes]
               .filter(Boolean).join(' | ') || '',
-            lead_status: 'novo',
-            lead_source: 'outro',
+            lead_status: hasCertificateData ? 'qualificado' : 'novo',
+            lead_source: hasCertificateData ? 'renovacao' : 'outro',
+            funnel_stage: hasCertificateData ? 'contato' : 'lead',
+            campaign_id: hasCertificateData ? renovationCampaign?.id : undefined,
           };
 
-          const client = await base44.entities.Client.create(clientData);
+          let client;
+          if (existingClient) {
+            await base44.entities.Client.update(existingClient.id, clientData);
+            client = { ...existingClient, ...clientData };
+          } else {
+            client = await base44.entities.Client.create(clientData);
+          }
 
           // Se tem dados de certificado, criar também
           if (hasCertificateData && (record.dt_emis || record.dt_fim)) {
@@ -402,7 +440,7 @@ export default function DataImport() {
       
       setImportStatus({ 
         type: 'success', 
-        message: `${imported} registro(s) importado(s) com sucesso!${hasCertificateData ? ' (incluindo certificados)' : ''}` 
+        message: `${imported} registro(s) importado(s) com sucesso!${hasCertificateData ? ' Clientes de renovação inseridos no funil automaticamente.' : ''}` 
       });
       setExtractedData(null);
       setShowEditor(false);

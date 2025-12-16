@@ -147,9 +147,62 @@ export default function Renewals() {
         const records = Array.isArray(rawData) ? rawData : [rawData];
         let imported = 0;
 
+        // Buscar ou criar campanha de renovação
+        const campaigns = await base44.entities.Campaign.filter({ name: 'Renovação de Certificados' });
+        let renovationCampaign;
+        if (campaigns.length === 0) {
+          renovationCampaign = await base44.entities.Campaign.create({
+            name: 'Renovação de Certificados',
+            description: 'Campanha automática para renovação de certificados digitais',
+            status: 'ativa',
+            start_date: new Date().toISOString().split('T')[0],
+          });
+        } else {
+          renovationCampaign = campaigns[0];
+        }
+
+        // Buscar clientes existentes
+        const existingClients = await base44.entities.Client.list('-created_date', 2000);
+
         for (const record of records) {
           try {
-            // Determinar tipo de certificado a partir do campo PRODUTO
+            const cpf = String(record.cpf || '').replace(/\D/g, '');
+            const cnpj = String(record.cnpj || '').replace(/\D/g, '');
+            
+            // Verificar se cliente já existe por CPF ou CNPJ
+            let client = existingClients.find(c => {
+              const cCpf = String(c.cpf || '').replace(/\D/g, '');
+              const cCnpj = String(c.cnpj || '').replace(/\D/g, '');
+              if (cpf && cCpf && cpf === cCpf) return true;
+              if (cnpj && cCnpj && cnpj === cCnpj) return true;
+              return false;
+            });
+
+            // Criar ou atualizar cliente no Cadastro Central
+            const clientData = {
+              client_name: record.nome || 'Sem nome',
+              cpf: cpf || '',
+              cnpj: cnpj || '',
+              email: record.email || '',
+              phone: record.telefone || '',
+              whatsapp: record.telefone || '',
+              business_area: record.produto || '',
+              lead_status: 'qualificado',
+              lead_source: 'renovacao',
+              funnel_stage: 'contato',
+              campaign_id: renovationCampaign.id,
+              notes: `Renovação automática - ${record.unid_atendimento || ''}`,
+            };
+
+            if (client) {
+              // Atualizar cliente existente
+              await base44.entities.Client.update(client.id, clientData);
+            } else {
+              // Criar novo cliente
+              client = await base44.entities.Client.create(clientData);
+            }
+
+            // Determinar tipo de certificado
             let certType = 'e_cpf_a3';
             const produto = String(record.produto || '').toLowerCase();
             if (produto.includes('cnpj')) {
@@ -158,7 +211,7 @@ export default function Renewals() {
               certType = produto.includes('a1') ? 'e_cpf_a1' : 'e_cpf_a3';
             }
 
-            // Formatar datas (dd/mm/yyyy para yyyy-mm-dd)
+            // Formatar datas
             const formatDate = (dateStr) => {
               if (!dateStr) return null;
               const str = String(dateStr);
@@ -171,7 +224,9 @@ export default function Renewals() {
               return str;
             };
 
+            // Criar registro de certificado
             await base44.entities.Certificate.create({
+              client_id: client.id,
               client_name: record.nome || 'Sem nome',
               client_email: record.email || '',
               client_phone: record.telefone || '',
@@ -182,6 +237,7 @@ export default function Renewals() {
               renewal_status: 'pendente',
               notes: record.unid_atendimento || '',
             });
+
             imported++;
           } catch (err) {
             console.error('Erro ao importar registro:', err);
@@ -190,9 +246,10 @@ export default function Renewals() {
 
         setUploadStatus({ 
           type: 'success', 
-          message: `${imported} certificados importados com sucesso!` 
+          message: `${imported} certificados importados, clientes cadastrados e inseridos no funil!` 
         });
         queryClient.invalidateQueries(['certificates']);
+        queryClient.invalidateQueries(['clients']);
       } else {
         setUploadStatus({ type: 'error', message: result.details || 'Erro ao processar arquivo' });
       }
