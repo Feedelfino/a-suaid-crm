@@ -45,7 +45,11 @@ export default function SalesPipeline() {
   const [showScores, setShowScores] = useState(true);
   const [user, setUser] = useState(null);
   const [userAccess, setUserAccess] = useState(null);
-  const [selectedCampaign, setSelectedCampaign] = useState('all');
+  
+  // Persistir seleção de campanha na sessão
+  const [selectedCampaign, setSelectedCampaign] = useState(() => {
+    return sessionStorage.getItem('selectedCampaign') || 'all';
+  });
 
   React.useEffect(() => {
     const loadUser = async () => {
@@ -67,6 +71,11 @@ export default function SalesPipeline() {
     userAccess?.roles?.includes('agente_comercial');
 
   const isAdmin = user?.role === 'admin' || userAccess?.roles?.includes('administrador');
+
+  // Persistir campanha selecionada na mudança
+  React.useEffect(() => {
+    sessionStorage.setItem('selectedCampaign', selectedCampaign);
+  }, [selectedCampaign]);
 
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ['pipeline-clients'],
@@ -238,6 +247,26 @@ export default function SalesPipeline() {
         </div>
       </div>
 
+      {/* Debug Info - Campanhas Disponíveis */}
+      {campaigns.length === 0 && (
+        <Card className="border-2 border-amber-300 bg-amber-50 shadow-md">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-200 flex items-center justify-center flex-shrink-0">
+                ⚠️
+              </div>
+              <div>
+                <p className="font-semibold text-amber-900 mb-1">Nenhuma campanha ativa disponível</p>
+                <p className="text-sm text-amber-800">
+                  Para ver leads no funil, você precisa estar atribuído a uma campanha ativa. 
+                  Peça ao administrador para designar você a uma campanha.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats Cards */}
       <div className="flex gap-4 flex-wrap">
         <Card className="border-0 shadow-md px-4 py-2">
@@ -258,19 +287,28 @@ export default function SalesPipeline() {
             </div>
           </div>
         </Card>
-        {selectedCampaign !== 'all' && (
+        {selectedCampaign !== 'all' && campaigns.find(c => c.id === selectedCampaign) && (
           <Card className="border-0 shadow-md px-4 py-2 bg-[#6B2D8B]/5">
             <div className="flex items-center gap-3">
               <Filter className="w-5 h-5 text-[#6B2D8B]" />
               <div>
-                <p className="text-xs text-slate-500">Campanha</p>
+                <p className="text-xs text-slate-500">Campanha Filtrada</p>
                 <p className="font-bold text-[#6B2D8B]">
-                  {campaigns.find(c => c.id === selectedCampaign)?.name || 'Selecionada'}
+                  {campaigns.find(c => c.id === selectedCampaign)?.name}
                 </p>
               </div>
             </div>
           </Card>
         )}
+        <Card className="border-0 shadow-md px-4 py-2">
+          <div className="flex items-center gap-3">
+            <Filter className="w-5 h-5 text-blue-600" />
+            <div>
+              <p className="text-xs text-slate-500">Campanhas Ativas</p>
+              <p className="font-bold text-slate-800">{campaigns.length}</p>
+            </div>
+          </div>
+        </Card>
       </div>
 
       {/* Funnel Stats */}
