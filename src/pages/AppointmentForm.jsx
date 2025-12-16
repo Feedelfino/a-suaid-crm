@@ -62,6 +62,7 @@ export default function AppointmentForm() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [user, setUser] = useState(null);
+  const [conflictWarning, setConflictWarning] = useState(null);
   const { getDisplayName, accessRecords } = useUserDisplayName();
 
   const approvedUsers = accessRecords.filter(r => r.status === 'approved');
@@ -168,8 +169,32 @@ export default function AppointmentForm() {
     }
   };
 
-  const handleChange = (field, value) => {
+  const handleChange = async (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Check double booking when date/time/agent changes
+    if (['date', 'time', 'duration', 'agent_email'].includes(field)) {
+      const checkData = { ...formData, [field]: value };
+      if (checkData.date && checkData.time && checkData.agent_email) {
+        try {
+          const response = await base44.functions.invoke('checkDoubleBooking', {
+            date: checkData.date,
+            time: checkData.time,
+            duration: checkData.duration || 30,
+            agentEmail: checkData.agent_email,
+            excludeAppointmentId: appointmentId
+          });
+          
+          if (response.data.hasConflict) {
+            setConflictWarning(response.data);
+          } else {
+            setConflictWarning(null);
+          }
+        } catch (e) {
+          console.error('Error checking conflicts:', e);
+        }
+      }
+    }
   };
 
   const handleAgentSelect = (email) => {
@@ -246,6 +271,14 @@ export default function AppointmentForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Block if has conflict
+    if (conflictWarning) {
+      if (!confirm('ATENÇÃO: Há conflito de horário! Deseja continuar mesmo assim?')) {
+        return;
+      }
+    }
+    
     setIsSaving(true);
     
     try {
@@ -731,6 +764,42 @@ export default function AppointmentForm() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Conflict Warning */}
+          {conflictWarning && (
+            <Card className="border-2 border-red-500 shadow-lg bg-red-50">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center text-white flex-shrink-0">
+                    ⚠️
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-red-800 mb-2">Conflito de Horário Detectado!</h3>
+                    {conflictWarning.conflicts?.length > 0 && (
+                      <div className="mb-3">
+                        <p className="text-sm font-semibold text-red-700">Compromissos no CRM:</p>
+                        {conflictWarning.conflicts.map(c => (
+                          <p key={c.id} className="text-sm text-red-600">
+                            • {c.time} - {c.title} {c.client_name && `(${c.client_name})`}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {conflictWarning.googleConflicts?.length > 0 && (
+                      <div>
+                        <p className="text-sm font-semibold text-red-700">Eventos no Google Calendar:</p>
+                        {conflictWarning.googleConflicts.map(e => (
+                          <p key={e.id} className="text-sm text-red-600">
+                            • {new Date(e.start).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})} - {e.title}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Observações */}
           <Card className="border-0 shadow-lg">

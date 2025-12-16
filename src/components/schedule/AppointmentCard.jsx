@@ -4,8 +4,9 @@ import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
 import { 
   Phone, Video, MapPin, MoreVertical, Edit, Trash2,
-  Users, Building2, Briefcase, Mail, ExternalLink
+  Users, Building2, Briefcase, Mail, ExternalLink, StickyNote
 } from 'lucide-react';
+import AppointmentNotesDialog from './AppointmentNotesDialog';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -40,6 +41,7 @@ export default function AppointmentCard({ apt, compact = false, onDelete, getDis
   const Icon = typeIcons[apt.appointment_type] || Phone;
   const isInternal = apt.category === 'interno';
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [notesDialogOpen, setNotesDialogOpen] = useState(false);
 
   const handleSendEmail = async () => {
     setIsSendingEmail(true);
@@ -138,6 +140,10 @@ export default function AppointmentCard({ apt, compact = false, onDelete, getDis
               </DropdownMenuItem>
             </Link>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setNotesDialogOpen(true)}>
+              <StickyNote className="w-4 h-4 mr-2 text-purple-600" />
+              Lembretes e Notas
+            </DropdownMenuItem>
             {(apt.google_meet_link || apt.meeting_link) && (
               <DropdownMenuItem onClick={handleOpenMeet}>
                 <ExternalLink className="w-4 h-4 mr-2 text-blue-600" />
@@ -164,6 +170,11 @@ export default function AppointmentCard({ apt, compact = false, onDelete, getDis
           {isInternal ? 'Interno' : `Agente: ${getDisplayName ? getDisplayName(apt.agent_email, apt.agent) : apt.agent}`}
         </p>
       )}
+      <AppointmentNotesDialog 
+        appointment={apt}
+        open={notesDialogOpen}
+        onOpenChange={setNotesDialogOpen}
+      />
     </div>
   );
 }

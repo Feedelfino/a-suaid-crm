@@ -29,6 +29,7 @@ export default function Schedule() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedEventType, setSelectedEventType] = useState('all');
   const [user, setUser] = useState(null);
+  const [showGoogleEvents, setShowGoogleEvents] = useState(true);
   const { getDisplayName, accessRecords } = useUserDisplayName();
   
   // Usuários aprovados como agentes
@@ -53,6 +54,26 @@ export default function Schedule() {
     queryKey: ['appointments'],
     queryFn: () => base44.entities.Appointment.list('-date', 500),
   });
+
+  // Fetch Google Calendar events for the week
+  const { data: googleEventsData } = useQuery({
+    queryKey: ['google-events', format(weekStart, 'yyyy-MM-dd'), format(addDays(weekStart, 6), 'yyyy-MM-dd')],
+    queryFn: async () => {
+      try {
+        const response = await base44.functions.invoke('googleCalendarFetch', {
+          startDate: format(weekStart, 'yyyy-MM-dd'),
+          endDate: format(addDays(weekStart, 7), 'yyyy-MM-dd')
+        });
+        return response.data;
+      } catch (e) {
+        console.error('Error fetching Google events:', e);
+        return { events: [] };
+      }
+    },
+    enabled: showGoogleEvents
+  });
+
+  const googleEvents = googleEventsData?.events || [];
 
   const deleteAppointment = useMutation({
     mutationFn: (id) => base44.entities.Appointment.delete(id),
@@ -91,11 +112,32 @@ export default function Schedule() {
 
   const getAppointmentsForSlot = (date, hour) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    return filteredAppointments.filter(apt => {
+    const crmAppts = filteredAppointments.filter(apt => {
       const matchesDate = apt.date === dateStr;
       const matchesHour = apt.time?.startsWith(hour.split(':')[0]);
       return matchesDate && matchesHour;
     });
+
+    // Add Google Calendar events if enabled
+    const googleAppts = showGoogleEvents ? googleEvents.filter(event => {
+      if (event.status === 'cancelled') return false;
+      const eventDate = new Date(event.start);
+      const eventDateStr = format(eventDate, 'yyyy-MM-dd');
+      const eventHour = format(eventDate, 'HH');
+      return eventDateStr === dateStr && eventHour === hour.split(':')[0];
+    }).map(e => ({
+      id: `google-${e.id}`,
+      title: e.title,
+      time: format(new Date(e.start), 'HH:mm'),
+      meeting_link: e.meet_link,
+      google_meet_link: e.meet_link,
+      source: 'google',
+      category: 'google',
+      appointment_type: e.meet_link ? 'videoconferencia' : 'telefone',
+      status: 'confirmada'
+    })) : [];
+
+    return [...crmAppts, ...googleAppts];
   };
 
   const getAppointmentsForDay = (date) => {
@@ -133,6 +175,15 @@ export default function Schedule() {
           <p className="text-slate-500">Gerencie reuniões comerciais e compromissos internos</p>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant={showGoogleEvents ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowGoogleEvents(!showGoogleEvents)}
+            className={showGoogleEvents ? "bg-blue-600 hover:bg-blue-700" : ""}
+          >
+            <CalendarIcon className="w-4 h-4 mr-2" />
+            Google Calendar
+          </Button>
           <Link to={createPageUrl('AppointmentForm')}>
             <Button className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]">
               <Plus className="w-4 h-4 mr-2" />
@@ -243,7 +294,7 @@ export default function Schedule() {
                               key={apt.id} 
                               apt={apt} 
                               compact 
-                              onDelete={(id) => deleteAppointment.mutate(id)}
+                              onDelete={apt.source !== 'google' ? (id) => deleteAppointment.mutate(id) : null}
                               getDisplayName={getDisplayName}
                             />
                           ))}
