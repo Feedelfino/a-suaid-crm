@@ -105,7 +105,7 @@ export default function Renewals() {
     return daysUntil >= 0 && daysUntil <= 45;
   });
 
-  // Upload de planilha
+  // Upload de planilha (mesmos critérios do Banco de Dados)
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -118,43 +118,69 @@ export default function Renewals() {
       const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
         file_url,
         json_schema: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              client_name: { type: 'string' },
-              client_email: { type: 'string' },
-              client_phone: { type: 'string' },
-              certificate_type: { type: 'string' },
-              issue_date: { type: 'string' },
-              expiry_date: { type: 'string' },
+          type: "object",
+          properties: {
+            registros: {
+              type: "array",
+              description: "Lista de registros extraídos do arquivo",
+              items: {
+                type: "object",
+                properties: {
+                  produto: { type: "string", description: "PRODUTO, tipo de certificado digital" },
+                  cnpj: { type: "string", description: "CNPJ da empresa" },
+                  cpf: { type: "string", description: "CPF do titular" },
+                  nome: { type: "string", description: "NOME DO TITULAR, nome completo" },
+                  telefone: { type: "string", description: "TELEFONE, celular" },
+                  email: { type: "string", description: "EMAIL, e-mail" },
+                  unid_atendimento: { type: "string", description: "UNID_ATENDIMENTO, local de atendimento" },
+                  dt_emis: { type: "string", description: "DT_EMIS, data de emissão" },
+                  dt_fim: { type: "string", description: "DT_FIM, data de vencimento" },
+                }
+              }
             }
           }
         }
       });
 
       if (result.status === 'success' && result.output) {
-        const records = Array.isArray(result.output) ? result.output : [result.output];
+        const rawData = result.output.registros || result.output;
+        const records = Array.isArray(rawData) ? rawData : [rawData];
         let imported = 0;
 
         for (const record of records) {
           try {
-            // Mapear tipo de certificado
-            let certType = record.certificate_type?.toLowerCase();
-            if (certType?.includes('cpf') && certType?.includes('a1')) certType = 'e_cpf_a1';
-            else if (certType?.includes('cpf') && certType?.includes('a3')) certType = 'e_cpf_a3';
-            else if (certType?.includes('cnpj') && certType?.includes('a1')) certType = 'e_cnpj_a1';
-            else if (certType?.includes('cnpj') && certType?.includes('a3')) certType = 'e_cnpj_a3';
+            // Determinar tipo de certificado a partir do campo PRODUTO
+            let certType = 'e_cpf_a3';
+            const produto = String(record.produto || '').toLowerCase();
+            if (produto.includes('cnpj')) {
+              certType = produto.includes('a1') ? 'e_cnpj_a1' : 'e_cnpj_a3';
+            } else if (produto.includes('cpf')) {
+              certType = produto.includes('a1') ? 'e_cpf_a1' : 'e_cpf_a3';
+            }
+
+            // Formatar datas (dd/mm/yyyy para yyyy-mm-dd)
+            const formatDate = (dateStr) => {
+              if (!dateStr) return null;
+              const str = String(dateStr);
+              if (str.includes('/')) {
+                const parts = str.split('/');
+                if (parts.length === 3) {
+                  return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                }
+              }
+              return str;
+            };
 
             await base44.entities.Certificate.create({
-              client_name: record.client_name,
-              client_email: record.client_email,
-              client_phone: record.client_phone,
-              certificate_type: certType || 'e_cpf_a1',
-              issue_date: record.issue_date,
-              expiry_date: record.expiry_date,
+              client_name: record.nome || 'Sem nome',
+              client_email: record.email || '',
+              client_phone: record.telefone || '',
+              certificate_type: certType,
+              issue_date: formatDate(record.dt_emis),
+              expiry_date: formatDate(record.dt_fim),
               status: 'ativo',
               renewal_status: 'pendente',
+              notes: record.unid_atendimento || '',
             });
             imported++;
           } catch (err) {
@@ -168,7 +194,7 @@ export default function Renewals() {
         });
         queryClient.invalidateQueries(['certificates']);
       } else {
-        setUploadStatus({ type: 'error', message: 'Erro ao processar arquivo' });
+        setUploadStatus({ type: 'error', message: result.details || 'Erro ao processar arquivo' });
       }
     } catch (error) {
       setUploadStatus({ type: 'error', message: 'Erro ao fazer upload do arquivo' });
@@ -299,23 +325,61 @@ export default function Renewals() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Importar Certificados</DialogTitle>
+              <DialogTitle>Importar Certificados para Renovação</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <p className="text-sm text-slate-600">
-                Faça upload de uma planilha (CSV ou Excel) com as colunas:
+                Faça upload de uma planilha (CSV, Excel ou PDF) seguindo as <strong>mesmas especificações do Banco de Dados</strong>:
               </p>
-              <ul className="text-sm text-slate-500 list-disc list-inside">
-                <li>Nome do cliente</li>
-                <li>E-mail</li>
-                <li>Telefone</li>
-                <li>Tipo de certificado (e-CPF A1, e-CPF A3, etc)</li>
-                <li>Data de emissão</li>
-                <li>Data de vencimento</li>
-              </ul>
+              
+              <div className="p-3 bg-slate-50 rounded-lg">
+                <p className="text-sm font-semibold text-slate-700 mb-2">Colunas necessárias na primeira linha:</p>
+                <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                  <div className="flex items-center gap-1">
+                    <Badge variant="outline" className="text-xs">PRODUTO</Badge>
+                    <span>- Tipo de certificado</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Badge variant="outline" className="text-xs">CNPJ</Badge>
+                    <span>- Documento empresa</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Badge variant="outline" className="text-xs">CPF</Badge>
+                    <span>- Documento titular</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Badge className="text-xs bg-[#6B2D8B]">NOME</Badge>
+                    <span>- Nome titular *</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Badge variant="outline" className="text-xs">TELEFONE</Badge>
+                    <span>- Contato</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Badge variant="outline" className="text-xs">EMAIL</Badge>
+                    <span>- E-mail</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Badge variant="outline" className="text-xs">DT_EMIS</Badge>
+                    <span>- Data emissão</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Badge variant="outline" className="text-xs">DT_FIM</Badge>
+                    <span>- Data vencimento</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-xs text-slate-500 space-y-1">
+                <p>✓ Formatos: CSV, Excel (.xlsx, .xls) ou PDF</p>
+                <p>✓ Tamanho máximo: 15MB</p>
+                <p>✓ Datas no formato: dd/mm/aaaa</p>
+                <p>✓ Primeira linha deve conter os cabeçalhos</p>
+              </div>
+
               <Input
                 type="file"
-                accept=".csv,.xlsx,.xls"
+                accept=".csv,.xlsx,.xls,.pdf"
                 onChange={handleFileUpload}
               />
               {uploadStatus && (
