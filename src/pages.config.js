@@ -19,6 +19,8 @@ import Chat from './pages/Chat';
 import Renewals from './pages/Renewals';
 import AgentPerformance from './pages/AgentPerformance';
 import HelpCenter from './pages/HelpCenter';
+import RenewalsDashboard from './pages/RenewalsDashboard';
+import MigrationControl from './pages/MigrationControl';
 import __Layout from './Layout.jsx';
 
 
@@ -44,6 +46,8 @@ export const PAGES = {
     "Renewals": Renewals,
     "AgentPerformance": AgentPerformance,
     "HelpCenter": HelpCenter,
+    "RenewalsDashboard": RenewalsDashboard,
+    "MigrationControl": MigrationControl,
 }
 
 export const pagesConfig = {

@@ -164,6 +164,7 @@ export default function Layout({ children, currentPageName }) {
     { name: 'Campanhas', icon: Target, page: 'Campaigns' },
     { name: 'Relatórios', icon: FileText, page: 'Reports' },
     { name: 'Renovações', icon: RefreshCw, page: 'Renewals' },
+    { name: 'Dashboard Renovação', icon: RefreshCw, page: 'RenewalsDashboard' },
     { name: 'Banco de Dados', icon: Database, page: 'DataImport' },
     { name: 'Notas', icon: StickyNote, page: 'Notes' },
     { name: 'Chat', icon: MessageSquare, page: 'Chat' },
