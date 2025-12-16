@@ -85,7 +85,7 @@ export default function SalesPipeline() {
 
   const { data: campaigns = [] } = useQuery({
     queryKey: ['pipeline-campaigns'],
-    queryFn: () => base44.entities.Campaign.list(),
+    queryFn: () => base44.entities.Campaign.filter({ status: 'ativa' }),
   });
 
   const { data: funnelConfigs = [] } = useQuery({
@@ -191,17 +191,7 @@ export default function SalesPipeline() {
               <DropdownMenuSeparator />
               {campaigns.map(campaign => (
                 <SelectItem key={campaign.id} value={campaign.id}>
-                  <div className="flex items-center gap-2">
-                    <Badge 
-                      variant="outline" 
-                      className={`text-xs ${
-                        campaign.status === 'ativa' ? 'border-green-500 text-green-600' : 'border-slate-400'
-                      }`}
-                    >
-                      {campaign.status}
-                    </Badge>
-                    {campaign.name}
-                  </div>
+                  {campaign.name}
                 </SelectItem>
               ))}
             </SelectContent>

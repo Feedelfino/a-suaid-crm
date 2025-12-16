@@ -36,12 +36,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import CampaignLeadsManager from '@/components/campaigns/CampaignLeadsManager';
+import CampaignUserManager from '@/components/campaigns/CampaignUserManager';
 
 export default function Campaigns() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState(null);
   const [managingLeadsCampaign, setManagingLeadsCampaign] = useState(null);
+  const [managingUsersCampaign, setManagingUsersCampaign] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -379,9 +381,15 @@ export default function Campaigns() {
                         Encerrar
                       </DropdownMenuItem>
                       <DropdownMenuItem 
-                        onClick={() => setManagingLeadsCampaign(campaign)}
+                        onClick={() => setManagingUsersCampaign(campaign)}
                       >
                         <Users className="w-4 h-4 mr-2" />
+                        Designar Usuários
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => setManagingLeadsCampaign(campaign)}
+                      >
+                        <TrendingUp className="w-4 h-4 mr-2" />
                         Gerenciar Leads
                       </DropdownMenuItem>
                       <DropdownMenuItem 
@@ -446,6 +454,23 @@ export default function Campaigns() {
           </CardContent>
         </Card>
       )}
+
+      {/* Dialog para designar usuários */}
+      <Dialog open={!!managingUsersCampaign} onOpenChange={(open) => !open && setManagingUsersCampaign(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Designar Usuários - {managingUsersCampaign?.name}</DialogTitle>
+          </DialogHeader>
+          {managingUsersCampaign && (
+            <CampaignUserManager 
+              campaign={managingUsersCampaign} 
+              onUpdate={() => {
+                queryClient.invalidateQueries(['campaigns']);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog para gerenciar leads da campanha */}
       <Dialog open={!!managingLeadsCampaign} onOpenChange={(open) => !open && setManagingLeadsCampaign(null)}>
