@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Users, UserPlus, X, Shield, User as UserIcon } from 'lucide-react';
@@ -17,11 +17,31 @@ import {
 export default function CampaignUserManager({ campaign, onUpdate }) {
   const [selectedUser, setSelectedUser] = useState('');
   const [isManager, setIsManager] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  React.useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const userData = await base44.auth.me();
+        setCurrentUser(userData);
+      } catch (e) {
+        console.error('Error loading user:', e);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadUser();
+  }, []);
 
   const { data: accessRecords = [] } = useQuery({
     queryKey: ['user-access-approved'],
     queryFn: () => base44.entities.UserAccess.filter({ status: 'approved' }),
   });
+
+  // Verificar se usuário tem permissão para editar
+  const canEdit = currentUser?.role === 'admin' || 
+                  currentUser?.email === campaign.campaign_manager;
 
   const assignedEmails = campaign.assigned_agents || [];
   const managerEmail = campaign.campaign_manager;
@@ -30,52 +50,87 @@ export default function CampaignUserManager({ campaign, onUpdate }) {
   const availableUsers = accessRecords.filter(u => !assignedEmails.includes(u.user_email) && u.user_email !== managerEmail);
 
   const handleAddUser = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || !canEdit) return;
 
-    const updatedAgents = [...assignedEmails];
-    if (!updatedAgents.includes(selectedUser)) {
-      updatedAgents.push(selectedUser);
+    try {
+      const updatedAgents = [...assignedEmails];
+      if (!updatedAgents.includes(selectedUser)) {
+        updatedAgents.push(selectedUser);
+      }
+
+      const updateData = {
+        assigned_agents: updatedAgents,
+      };
+
+      if (isManager) {
+        updateData.campaign_manager = selectedUser;
+      }
+
+      await base44.entities.Campaign.update(campaign.id, updateData);
+      onUpdate();
+      setSelectedUser('');
+      setIsManager(false);
+    } catch (error) {
+      console.error('Erro ao adicionar usuário:', error);
+      alert('Erro ao adicionar usuário. Verifique suas permissões.');
     }
-
-    const updateData = {
-      assigned_agents: updatedAgents,
-    };
-
-    if (isManager) {
-      updateData.campaign_manager = selectedUser;
-    }
-
-    await base44.entities.Campaign.update(campaign.id, updateData);
-    onUpdate();
-    setSelectedUser('');
-    setIsManager(false);
   };
 
   const handleRemoveUser = async (email) => {
-    const updatedAgents = assignedEmails.filter(e => e !== email);
+    if (!canEdit) return;
     
-    const updateData = {
-      assigned_agents: updatedAgents,
-    };
+    try {
+      const updatedAgents = assignedEmails.filter(e => e !== email);
+      
+      const updateData = {
+        assigned_agents: updatedAgents,
+      };
 
-    // Se remover o gerente
-    if (email === managerEmail) {
-      updateData.campaign_manager = '';
+      // Se remover o gerente
+      if (email === managerEmail) {
+        updateData.campaign_manager = '';
+      }
+
+      await base44.entities.Campaign.update(campaign.id, updateData);
+      onUpdate();
+    } catch (error) {
+      console.error('Erro ao remover usuário:', error);
+      alert('Erro ao remover usuário. Verifique suas permissões.');
     }
-
-    await base44.entities.Campaign.update(campaign.id, updateData);
-    onUpdate();
   };
 
   const handleSetManager = async (email) => {
-    await base44.entities.Campaign.update(campaign.id, {
-      campaign_manager: email,
-    });
-    onUpdate();
+    if (!canEdit) return;
+    
+    try {
+      await base44.entities.Campaign.update(campaign.id, {
+        campaign_manager: email,
+      });
+      onUpdate();
+    } catch (error) {
+      console.error('Erro ao definir gerente:', error);
+      alert('Erro ao definir gerente. Verifique suas permissões.');
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin w-8 h-8 border-4 border-[#6B2D8B] border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      {!canEdit && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-sm text-amber-800">
+            <strong>Acesso Restrito:</strong> Apenas o gerente da campanha ou administradores podem designar usuários.
+          </p>
+        </div>
+      )}
+      
       <Card className="border-0 shadow-lg">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -86,21 +141,31 @@ export default function CampaignUserManager({ campaign, onUpdate }) {
         <CardContent className="space-y-4">
           {/* Add User */}
           <div className="flex gap-2">
-            <Select value={selectedUser} onValueChange={setSelectedUser}>
+            <Select 
+              value={selectedUser} 
+              onValueChange={setSelectedUser}
+              disabled={!canEdit}
+            >
               <SelectTrigger className="flex-1">
                 <SelectValue placeholder="Selecione um usuário" />
               </SelectTrigger>
               <SelectContent>
-                {availableUsers.map(user => (
-                  <SelectItem key={user.user_email} value={user.user_email}>
-                    {user.nickname || user.user_name} ({user.user_email})
-                  </SelectItem>
-                ))}
+                {availableUsers.length === 0 ? (
+                  <div className="px-2 py-4 text-center text-sm text-slate-500">
+                    Todos os usuários já estão atribuídos
+                  </div>
+                ) : (
+                  availableUsers.map(user => (
+                    <SelectItem key={user.user_email} value={user.user_email}>
+                      {user.nickname || user.user_name} ({user.user_email})
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
             <Button 
               onClick={handleAddUser}
-              disabled={!selectedUser}
+              disabled={!selectedUser || !canEdit}
               className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]"
             >
               <UserPlus className="w-4 h-4 mr-2" />
@@ -115,6 +180,7 @@ export default function CampaignUserManager({ campaign, onUpdate }) {
               checked={isManager}
               onChange={(e) => setIsManager(e.target.checked)}
               className="w-4 h-4"
+              disabled={!canEdit}
             />
             <label htmlFor="isManager" className="text-sm text-slate-600">
               Definir como Gerente da Campanha
@@ -173,7 +239,7 @@ export default function CampaignUserManager({ campaign, onUpdate }) {
                         Gerente
                       </Badge>
                     )}
-                    {user.user_email !== managerEmail && (
+                    {user.user_email !== managerEmail && canEdit && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -183,14 +249,16 @@ export default function CampaignUserManager({ campaign, onUpdate }) {
                         Tornar Gerente
                       </Button>
                     )}
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => handleRemoveUser(user.user_email)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
+                    {canEdit && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => handleRemoveUser(user.user_email)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))
