@@ -242,28 +242,26 @@ export default function AppointmentForm() {
 
     setIsSyncing(true);
     try {
-      const response = await base44.functions.invoke('googleCalendarSync', {
-        appointmentId,
-        action: formData.google_event_id ? 'update' : 'create',
+      const response = await base44.functions.invoke('syncGoogleCalendar', {
+        action: 'syncToGoogle',
+        appointmentId
       });
 
       if (response.data.success) {
-        // Atualizar dados locais
         setFormData(prev => ({
           ...prev,
           google_event_id: response.data.google_event_id || prev.google_event_id,
           google_meet_link: response.data.google_meet_link || prev.google_meet_link,
           meeting_link: response.data.google_meet_link || prev.meeting_link,
         }));
-        alert(formData.google_event_id ? 'Evento atualizado no Google Calendar!' : 'Evento criado no Google Calendar com sucesso!');
-        // Recarregar dados
+        alert('Sincronizado com Google Calendar!');
         await loadAppointment();
       } else {
         alert('Erro: ' + (response.data.error || 'Erro desconhecido'));
       }
     } catch (error) {
       console.error('Erro ao sincronizar:', error);
-      alert('Erro ao sincronizar com Google Calendar. Verifique se você autorizou o acesso.');
+      alert('Erro ao sincronizar com Google Calendar.');
     } finally {
       setIsSyncing(false);
     }
@@ -272,7 +270,6 @@ export default function AppointmentForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Block if has conflict
     if (conflictWarning) {
       if (!confirm('ATENÇÃO: Há conflito de horário! Deseja continuar mesmo assim?')) {
         return;
@@ -282,7 +279,6 @@ export default function AppointmentForm() {
     setIsSaving(true);
     
     try {
-      // Gerar título automático se não preenchido
       let finalData = { ...formData };
       if (!finalData.title) {
         if (finalData.category === 'comercial') {
@@ -292,12 +288,13 @@ export default function AppointmentForm() {
         }
       }
 
+      let aptId = appointmentId;
       if (appointmentId) {
         await base44.entities.Appointment.update(appointmentId, finalData);
       } else {
         const appointment = await base44.entities.Appointment.create(finalData);
+        aptId = appointment.id;
         
-        // Criar tarefa vinculada
         await base44.entities.Task.create({
           title: finalData.title,
           task_type: finalData.appointment_type === 'presencial' ? 'reuniao_presencial' : 
@@ -312,6 +309,17 @@ export default function AppointmentForm() {
           notes: finalData.description,
         });
       }
+
+      // Sync to Google Calendar
+      try {
+        await base44.functions.invoke('syncGoogleCalendar', {
+          action: 'syncToGoogle',
+          appointmentId: aptId
+        });
+      } catch (e) {
+        console.error('Google sync failed:', e);
+      }
+
       navigate(createPageUrl('Schedule'));
     } catch (error) {
       console.error('Error saving appointment:', error);

@@ -8,7 +8,7 @@ import { ptBR } from 'date-fns/locale';
 import { 
   ChevronLeft, ChevronRight, Plus, Phone, Video, MapPin,
   User, Clock, Calendar as CalendarIcon, MoreVertical, Edit, Trash2,
-  Users, Building2, Briefcase, BarChart3
+  Users, Building2, Briefcase, BarChart3, RefreshCw
 } from 'lucide-react';
 import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,16 +29,12 @@ export default function Schedule() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedEventType, setSelectedEventType] = useState('all');
   const [user, setUser] = useState(null);
-  const [showGoogleEvents, setShowGoogleEvents] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   const { getDisplayName, accessRecords } = useUserDisplayName();
   
-  // Usuários aprovados como agentes
-  const approvedUsers = accessRecords.filter(r => 
-    r.roles?.includes('agente_comercial') || 
-    r.roles?.includes('gerente') || 
-    r.roles?.includes('administrador') ||
-    r.status === 'approved'
-  );
+  const approvedUsers = accessRecords.filter(r => r.status === 'approved');
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   useEffect(() => {
     const loadUser = async () => {
@@ -50,109 +46,36 @@ export default function Schedule() {
     loadUser();
   }, []);
 
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+  // Auto-sync on mount and date change
+  useEffect(() => {
+    handleSync();
+  }, [weekStart]);
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['appointments'],
     queryFn: () => base44.entities.Appointment.list('-date', 500),
   });
 
-  // Fetch Google Calendar events for the week
-  const { data: googleEventsData } = useQuery({
-    queryKey: ['google-events', format(weekStart, 'yyyy-MM-dd'), format(addDays(weekStart, 6), 'yyyy-MM-dd')],
-    queryFn: async () => {
-      try {
-        const response = await base44.functions.invoke('googleCalendarFetch', {
-          startDate: format(weekStart, 'yyyy-MM-dd'),
-          endDate: format(addDays(weekStart, 7), 'yyyy-MM-dd')
-        });
-        return response.data;
-      } catch (e) {
-        console.error('Error fetching Google events:', e);
-        return { events: [] };
-      }
-    },
-    enabled: showGoogleEvents
-  });
-
-  const googleEvents = googleEventsData?.events || [];
-
   const deleteAppointment = useMutation({
     mutationFn: (id) => base44.entities.Appointment.delete(id),
     onSuccess: () => queryClient.invalidateQueries(['appointments']),
   });
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  // Aplicar filtros
-  const filteredAppointments = appointments.filter(apt => {
-    // Filtro por agente
-    if (selectedAgent === 'mine') {
-      if (apt.agent_email !== user?.email && apt.scheduled_by_email !== user?.email && 
-          !apt.participants?.includes(user?.email)) {
-        return false;
-      }
-    } else if (selectedAgent !== 'all') {
-      if (apt.agent_email !== selectedAgent && !apt.participants?.includes(selectedAgent)) {
-        return false;
-      }
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      await base44.functions.invoke('syncGoogleCalendar', {
+        action: 'syncFromGoogle',
+        startDate: format(weekStart, 'yyyy-MM-dd'),
+        endDate: format(addDays(weekStart, 7), 'yyyy-MM-dd')
+      });
+      queryClient.invalidateQueries(['appointments']);
+    } catch (e) {
+      console.error('Sync error:', e);
+    } finally {
+      setIsSyncing(false);
     }
-    
-    // Filtro por categoria
-    if (selectedCategory !== 'all') {
-      if ((apt.category || 'comercial') !== selectedCategory) return false;
-    }
-    
-    // Filtro por tipo de evento
-    if (selectedEventType !== 'all') {
-      if (apt.event_type !== selectedEventType) return false;
-    }
-    
-    return true;
-  });
-
-  const getAppointmentsForSlot = (date, hour) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const crmAppts = filteredAppointments.filter(apt => {
-      const matchesDate = apt.date === dateStr;
-      const matchesHour = apt.time?.startsWith(hour.split(':')[0]);
-      return matchesDate && matchesHour;
-    });
-
-    // Add Google Calendar events if enabled
-    const googleAppts = showGoogleEvents ? googleEvents.filter(event => {
-      if (event.status === 'cancelled') return false;
-      const eventDate = new Date(event.start);
-      const eventDateStr = format(eventDate, 'yyyy-MM-dd');
-      const eventHour = format(eventDate, 'HH');
-      return eventDateStr === dateStr && eventHour === hour.split(':')[0];
-    }).map(e => ({
-      id: `google-${e.id}`,
-      title: e.title,
-      time: format(new Date(e.start), 'HH:mm'),
-      meeting_link: e.meet_link,
-      google_meet_link: e.meet_link,
-      source: 'google',
-      category: 'google',
-      appointment_type: e.meet_link ? 'videoconferencia' : 'telefone',
-      status: 'confirmada'
-    })) : [];
-
-    return [...crmAppts, ...googleAppts];
   };
-
-  const getAppointmentsForDay = (date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return filteredAppointments.filter(apt => apt.date === dateStr);
-  };
-
-  // Compromissos do mês para estatísticas
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(currentDate);
-  const monthAppointments = appointments.filter(apt => {
-    if (!apt.date) return false;
-    const date = parseISO(apt.date);
-    return date >= monthStart && date <= monthEnd;
-  });
 
   const navigateDate = (direction) => {
     if (viewMode === 'day') {
@@ -166,23 +89,67 @@ export default function Schedule() {
     }
   };
 
+  // Apply filters
+  const filteredAppointments = appointments.filter(apt => {
+    if (selectedAgent === 'mine') {
+      if (apt.agent_email !== user?.email && apt.scheduled_by_email !== user?.email && 
+          !apt.participants?.includes(user?.email)) {
+        return false;
+      }
+    } else if (selectedAgent !== 'all') {
+      if (apt.agent_email !== selectedAgent && !apt.participants?.includes(selectedAgent)) {
+        return false;
+      }
+    }
+    
+    if (selectedCategory !== 'all' && (apt.category || 'comercial') !== selectedCategory) return false;
+    if (selectedEventType !== 'all' && apt.event_type !== selectedEventType) return false;
+    
+    return true;
+  });
+
+  const getAppointmentsForSlot = (date, hour) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return filteredAppointments.filter(apt => {
+      const matchesDate = apt.date === dateStr;
+      const matchesHour = apt.time?.startsWith(hour.split(':')[0]);
+      return matchesDate && matchesHour;
+    });
+  };
+
+  const getAppointmentsForDay = (date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return filteredAppointments.filter(apt => apt.date === dateStr);
+  };
+
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(currentDate);
+  const monthAppointments = appointments.filter(apt => {
+    if (!apt.date) return false;
+    const date = parseISO(apt.date);
+    return date >= monthStart && date <= monthEnd;
+  });
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Agenda Comercial e Corporativa</h1>
-          <p className="text-slate-500">Gerencie reuniões comerciais e compromissos internos</p>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            Agenda Comercial
+            {isSyncing && <RefreshCw className="w-5 h-5 animate-spin text-blue-600" />}
+          </h1>
+          <p className="text-slate-500">Sincronizado com Google Calendar</p>
         </div>
         <div className="flex items-center gap-3">
           <Button
-            variant={showGoogleEvents ? "default" : "outline"}
+            variant="outline"
             size="sm"
-            onClick={() => setShowGoogleEvents(!showGoogleEvents)}
-            className={showGoogleEvents ? "bg-blue-600 hover:bg-blue-700" : ""}
+            onClick={handleSync}
+            disabled={isSyncing}
           >
-            <CalendarIcon className="w-4 h-4 mr-2" />
-            Google Calendar
+            <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
           </Button>
           <Link to={createPageUrl('AppointmentForm')}>
             <Button className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]">
@@ -193,10 +160,10 @@ export default function Schedule() {
         </div>
       </div>
 
-      {/* Estatísticas */}
+      {/* Stats */}
       <ScheduleStats appointments={monthAppointments} />
 
-      {/* Filtros */}
+      {/* Filters & Navigation */}
       <Card className="border-0 shadow-lg">
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -241,24 +208,16 @@ export default function Schedule() {
         </CardContent>
       </Card>
 
-      {/* Calendário Semanal */}
+      {/* Weekly View */}
       {viewMode === 'week' && (
         <Card className="border-0 shadow-lg overflow-hidden">
           <div className="overflow-x-auto">
             <div className="min-w-[900px]">
-              {/* Header */}
               <div className="grid grid-cols-8 bg-slate-50 border-b">
-                <div className="p-3 text-center font-medium text-slate-500 text-sm">
-                  Horário
-                </div>
+                <div className="p-3 text-center font-medium text-slate-500 text-sm">Horário</div>
                 {weekDays.map((day) => (
-                  <div 
-                    key={day.toString()} 
-                    className={`p-3 text-center border-l ${isToday(day) ? 'bg-[#6B2D8B]/5' : ''}`}
-                  >
-                    <p className="text-xs text-slate-500 uppercase">
-                      {format(day, 'EEE', { locale: ptBR })}
-                    </p>
+                  <div key={day.toString()} className={`p-3 text-center border-l ${isToday(day) ? 'bg-[#6B2D8B]/5' : ''}`}>
+                    <p className="text-xs text-slate-500 uppercase">{format(day, 'EEE', { locale: ptBR })}</p>
                     <p className={`text-lg font-semibold ${isToday(day) ? 'text-[#6B2D8B]' : 'text-slate-800'}`}>
                       {format(day, 'd')}
                     </p>
@@ -266,24 +225,16 @@ export default function Schedule() {
                 ))}
               </div>
 
-              {/* Time Slots */}
               {HOURS.map((hour) => (
                 <div key={hour} className="grid grid-cols-8 border-b">
-                  <div className="p-2 text-center text-sm text-slate-500 bg-slate-50">
-                    {hour}
-                  </div>
+                  <div className="p-2 text-center text-sm text-slate-500 bg-slate-50">{hour}</div>
                   {weekDays.map((day) => {
                     const dayAppointments = getAppointmentsForSlot(day, hour);
                     const dateStr = format(day, 'yyyy-MM-dd');
                     return (
-                      <div 
-                        key={`${day}-${hour}`} 
-                        className={`p-1 border-l min-h-[80px] relative group ${isToday(day) ? 'bg-[#6B2D8B]/5' : ''}`}
-                      >
-                        <Link 
-                          to={createPageUrl(`AppointmentForm?date=${dateStr}&time=${hour}`)}
-                          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
+                      <div key={`${day}-${hour}`} className={`p-1 border-l min-h-[80px] relative group ${isToday(day) ? 'bg-[#6B2D8B]/5' : ''}`}>
+                        <Link to={createPageUrl(`AppointmentForm?date=${dateStr}&time=${hour}`)}
+                          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button size="icon" variant="ghost" className="h-6 w-6 bg-white shadow-sm hover:bg-slate-100">
                             <Plus className="w-3 h-3 text-[#6B2D8B]" />
                           </Button>
@@ -294,7 +245,7 @@ export default function Schedule() {
                               key={apt.id} 
                               apt={apt} 
                               compact 
-                              onDelete={apt.source !== 'google' ? (id) => deleteAppointment.mutate(id) : null}
+                              onDelete={(id) => deleteAppointment.mutate(id)}
                               getDisplayName={getDisplayName}
                             />
                           ))}
@@ -309,116 +260,65 @@ export default function Schedule() {
         </Card>
       )}
 
-      {/* Visão do Dia - Por Agente */}
+      {/* Day View */}
       {viewMode === 'day' && (
-        <div className="space-y-6">
-          {/* Lista por hora */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-lg">
-                Compromissos de {format(currentDate, "dd 'de' MMMM", { locale: ptBR })}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {HOURS.map(hour => {
-                  const hourAppointments = getAppointmentsForSlot(currentDate, hour);
-                  if (hourAppointments.length === 0) return null;
-                  
-                  return (
-                    <div key={hour} className="flex gap-4">
-                      <div className="w-16 text-sm text-slate-500 font-medium py-2">
-                        {hour}
-                      </div>
-                      <div className="flex-1 space-y-2">
-                        {hourAppointments.map(apt => (
-                          <AppointmentCard 
-                            key={apt.id} 
-                            apt={apt}
-                            onDelete={(id) => deleteAppointment.mutate(id)}
-                            getDisplayName={getDisplayName}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-                {getAppointmentsForDay(currentDate).length === 0 && (
-                  <div className="text-center py-12 text-slate-500">
-                    <CalendarIcon className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                    <p>Nenhum compromisso para este dia</p>
-                    <Link to={createPageUrl(`AppointmentForm?date=${format(currentDate, 'yyyy-MM-dd')}`)}>
-                      <Button className="mt-4" variant="outline">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Criar Compromisso
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Cards por Agente */}
-          {selectedAgent === 'all' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {approvedUsers.map(agentUser => {
-                const agentAppointments = appointments.filter(apt => 
-                  apt.date === format(currentDate, 'yyyy-MM-dd') && 
-                  (apt.agent_email === agentUser.user_email || apt.participants?.includes(agentUser.user_email))
-                );
+        <Card className="border-0 shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-lg">
+              Compromissos de {format(currentDate, "dd 'de' MMMM", { locale: ptBR })}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {HOURS.map(hour => {
+                const hourAppointments = getAppointmentsForSlot(currentDate, hour);
+                if (hourAppointments.length === 0) return null;
                 
                 return (
-                  <Card key={agentUser.user_email} className="border-0 shadow-lg">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#6B2D8B] to-[#8B4DAB] flex items-center justify-center text-white text-xs font-bold">
-                          {(agentUser.nickname || agentUser.user_name || '?').charAt(0).toUpperCase()}
-                        </div>
-                        {agentUser.nickname || agentUser.user_name}
-                        <Badge variant="secondary" className="ml-auto">{agentAppointments.length}</Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {agentAppointments.length === 0 ? (
-                        <p className="text-center py-4 text-sm text-slate-500">
-                          Sem compromissos
-                        </p>
-                      ) : (
-                        agentAppointments.map(apt => (
-                          <AppointmentCard 
-                            key={apt.id} 
-                            apt={apt}
-                            onDelete={(id) => deleteAppointment.mutate(id)}
-                            getDisplayName={getDisplayName}
-                          />
-                        ))
-                      )}
-                    </CardContent>
-                  </Card>
+                  <div key={hour} className="flex gap-4">
+                    <div className="w-16 text-sm text-slate-500 font-medium py-2">{hour}</div>
+                    <div className="flex-1 space-y-2">
+                      {hourAppointments.map(apt => (
+                        <AppointmentCard 
+                          key={apt.id} 
+                          apt={apt}
+                          onDelete={(id) => deleteAppointment.mutate(id)}
+                          getDisplayName={getDisplayName}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 );
               })}
+              {getAppointmentsForDay(currentDate).length === 0 && (
+                <div className="text-center py-12 text-slate-500">
+                  <CalendarIcon className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                  <p>Nenhum compromisso para este dia</p>
+                  <Link to={createPageUrl(`AppointmentForm?date=${format(currentDate, 'yyyy-MM-dd')}`)}>
+                    <Button className="mt-4" variant="outline">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Criar Compromisso
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Visão Mensal */}
+      {/* Month View */}
       {viewMode === 'month' && (
         <Card className="border-0 shadow-lg">
           <CardContent className="p-6">
             <div className="grid grid-cols-7 gap-1">
               {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                <div key={day} className="p-2 text-center text-sm font-medium text-slate-500">
-                  {day}
-                </div>
+                <div key={day} className="p-2 text-center text-sm font-medium text-slate-500">{day}</div>
               ))}
               {Array.from({ length: 42 }, (_, i) => {
                 const date = addDays(startOfWeek(startOfMonth(currentDate)), i);
                 const dayAppointments = getAppointmentsForDay(date);
                 const isCurrentMonth = isSameMonth(date, currentDate);
-                const comerciais = dayAppointments.filter(a => a.category !== 'interno');
-                const internos = dayAppointments.filter(a => a.category === 'interno');
                 
                 return (
                   <div 
@@ -439,7 +339,7 @@ export default function Schedule() {
                       {format(date, 'd')}
                     </p>
                     <div className="space-y-1">
-                      {comerciais.slice(0, 2).map(apt => (
+                      {dayAppointments.slice(0, 3).map(apt => (
                         <div 
                           key={apt.id}
                           className="text-xs p-1 rounded bg-gradient-to-r from-[#6B2D8B] to-[#8B4DAB] text-white truncate"
@@ -447,18 +347,8 @@ export default function Schedule() {
                           {apt.time} - {apt.client_name || apt.title}
                         </div>
                       ))}
-                      {internos.slice(0, 1).map(apt => (
-                        <div 
-                          key={apt.id}
-                          className="text-xs p-1 rounded bg-gradient-to-r from-blue-600 to-blue-700 text-white truncate"
-                        >
-                          {apt.time} - {apt.title}
-                        </div>
-                      ))}
                       {dayAppointments.length > 3 && (
-                        <p className="text-xs text-slate-500">
-                          +{dayAppointments.length - 3} mais
-                        </p>
+                        <p className="text-xs text-slate-500">+{dayAppointments.length - 3} mais</p>
                       )}
                     </div>
                   </div>
@@ -468,40 +358,6 @@ export default function Schedule() {
           </CardContent>
         </Card>
       )}
-
-      {/* Legenda */}
-      <div className="flex flex-wrap gap-6 justify-center">
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-slate-600 font-medium">Status:</span>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-500" />
-            <span className="text-sm text-slate-600">Confirmada</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-500" />
-            <span className="text-sm text-slate-600">Aguardando</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-emerald-500" />
-            <span className="text-sm text-slate-600">Concluída</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-orange-500" />
-            <span className="text-sm text-slate-600">No-show</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-slate-600 font-medium">Tipo:</span>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-purple-600" />
-            <span className="text-sm text-slate-600">Comercial</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-blue-600" />
-            <span className="text-sm text-slate-600">Interno</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
