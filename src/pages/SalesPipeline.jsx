@@ -7,8 +7,9 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { format, parseISO } from 'date-fns';
 import { 
   Users, Phone, Mail, Building2, ArrowRight, 
-  MoreVertical, Eye, DollarSign, TrendingUp, Sparkles, Zap, Filter
+  MoreVertical, Eye, DollarSign, TrendingUp, Sparkles, Zap, Filter, CheckCircle
 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -72,9 +73,37 @@ export default function SalesPipeline() {
 
   const isAdmin = user?.role === 'admin' || userAccess?.roles?.includes('administrador');
 
-  // Persistir campanha selecionada na mudança
+  // Notificar e persistir mudança de campanha
   React.useEffect(() => {
     sessionStorage.setItem('selectedCampaign', selectedCampaign);
+    
+    // Notificar mudança de campanha (exceto no carregamento inicial)
+    if (selectedCampaign && campaigns.length > 0) {
+      const campaign = campaigns.find(c => c.id === selectedCampaign);
+      const leadCount = selectedCampaign === 'all' 
+        ? clients.filter(c => !c.campaign_id || campaigns.map(camp => camp.id).includes(c.campaign_id)).length
+        : clients.filter(c => c.campaign_id === selectedCampaign).length;
+      
+      if (selectedCampaign === 'all') {
+        toast.success(
+          `Visualizando todas as campanhas - ${leadCount} leads no funil`,
+          { 
+            icon: '🔍',
+            duration: 3000,
+            style: { background: '#6B2D8B', color: 'white' }
+          }
+        );
+      } else if (campaign) {
+        toast.success(
+          `Campanha "${campaign.name}" selecionada - ${leadCount} leads`,
+          { 
+            icon: '🎯',
+            duration: 3000,
+            style: { background: '#6B2D8B', color: 'white' }
+          }
+        );
+      }
+    }
   }, [selectedCampaign]);
 
   const { data: clients = [], isLoading } = useQuery({
@@ -224,28 +253,49 @@ export default function SalesPipeline() {
         </div>
         <div className="flex gap-3 items-center flex-wrap">
           {/* Filtro por Campanha */}
-          <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-            <SelectTrigger className="w-56">
-              <SelectValue placeholder="Selecione uma campanha" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as Campanhas</SelectItem>
-              {campaigns.length > 0 && <DropdownMenuSeparator />}
-              {campaigns.map(campaign => (
-                <SelectItem key={campaign.id} value={campaign.id}>
+          <div className="relative">
+            <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+              <SelectTrigger className="w-56 bg-white border-2 border-slate-200 hover:border-[#6B2D8B] transition-colors">
+                <SelectValue placeholder="Selecione uma campanha" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">
                   <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full bg-green-500`} />
-                    {campaign.name}
+                    <Filter className="w-4 h-4 text-slate-500" />
+                    <span className="font-medium">Todas as Campanhas</span>
                   </div>
                 </SelectItem>
-              ))}
-              {campaigns.length === 0 && (
-                <div className="px-2 py-4 text-center text-sm text-slate-500">
-                  Nenhuma campanha ativa disponível
-                </div>
-              )}
-            </SelectContent>
-          </Select>
+                {campaigns.length > 0 && <DropdownMenuSeparator />}
+                {campaigns.map(campaign => {
+                  const campaignLeads = clients.filter(c => c.campaign_id === campaign.id).length;
+                  return (
+                    <SelectItem key={campaign.id} value={campaign.id}>
+                      <div className="flex items-center justify-between gap-3 w-full">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-green-500" />
+                          <span>{campaign.name}</span>
+                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          {campaignLeads}
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+                {campaigns.length === 0 && (
+                  <div className="px-2 py-4 text-center text-sm text-slate-500">
+                    Nenhuma campanha ativa disponível
+                    <p className="text-xs text-slate-400 mt-1">Peça ao admin para atribuí-lo</p>
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+            {campaigns.length > 0 && (
+              <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white text-xs font-bold shadow-lg">
+                {campaigns.length}
+              </div>
+            )}
+          </div>
 
           {/* Configuração de Etapas (apenas admin) */}
           {isAdmin && (
