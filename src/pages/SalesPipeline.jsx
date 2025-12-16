@@ -83,10 +83,14 @@ export default function SalesPipeline() {
     queryFn: () => base44.entities.Appointment.list('-date', 200),
   });
 
-  const { data: campaigns = [] } = useQuery({
+  // Buscar campanhas ativas (RLS já filtra por permissão)
+  const { data: allCampaigns = [] } = useQuery({
     queryKey: ['pipeline-campaigns'],
-    queryFn: () => base44.entities.Campaign.filter({ status: 'ativa' }),
+    queryFn: () => base44.entities.Campaign.list('-created_date'),
   });
+
+  // Filtrar apenas campanhas ativas
+  const campaigns = allCampaigns.filter(c => c.status === 'ativa');
 
   const { data: funnelConfigs = [] } = useQuery({
     queryKey: ['funnel-configs'],
@@ -133,7 +137,14 @@ export default function SalesPipeline() {
   const getClientsByStage = (stageId) => {
     return clients.filter(c => {
       const matchesStage = (c.funnel_stage || 'lead') === stageId;
-      const matchesCampaign = selectedCampaign === 'all' || c.campaign_id === selectedCampaign;
+      
+      // Se "Todas as Campanhas", mostrar todos os clientes
+      if (selectedCampaign === 'all') {
+        return matchesStage;
+      }
+      
+      // Se campanha específica, filtrar por campaign_id
+      const matchesCampaign = c.campaign_id === selectedCampaign;
       return matchesStage && matchesCampaign;
     });
   };
@@ -188,12 +199,20 @@ export default function SalesPipeline() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as Campanhas</SelectItem>
-              <DropdownMenuSeparator />
+              {campaigns.length > 0 && <DropdownMenuSeparator />}
               {campaigns.map(campaign => (
                 <SelectItem key={campaign.id} value={campaign.id}>
-                  {campaign.name}
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full bg-green-500`} />
+                    {campaign.name}
+                  </div>
                 </SelectItem>
               ))}
+              {campaigns.length === 0 && (
+                <div className="px-2 py-4 text-center text-sm text-slate-500">
+                  Nenhuma campanha ativa disponível
+                </div>
+              )}
             </SelectContent>
           </Select>
 
