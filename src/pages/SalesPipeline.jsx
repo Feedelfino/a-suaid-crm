@@ -92,14 +92,27 @@ export default function SalesPipeline() {
     queryFn: () => base44.entities.Appointment.list('-date', 200),
   });
 
-  // Buscar campanhas ativas (RLS já filtra por permissão)
+  // Buscar campanhas (RLS já filtra por permissão do usuário)
   const { data: allCampaigns = [] } = useQuery({
     queryKey: ['pipeline-campaigns'],
     queryFn: () => base44.entities.Campaign.list('-created_date'),
   });
 
-  // Filtrar apenas campanhas ativas
-  const campaigns = allCampaigns.filter(c => c.status === 'ativa');
+  // Filtrar apenas campanhas ativas onde o usuário está atribuído
+  const campaigns = React.useMemo(() => {
+    if (!user) return [];
+    
+    const activeCampaigns = allCampaigns.filter(c => c.status === 'ativa');
+    
+    // Admin vê todas
+    if (isAdmin) return activeCampaigns;
+    
+    // Outros usuários veem apenas onde estão atribuídos ou são gerentes
+    return activeCampaigns.filter(c => 
+      c.assigned_agents?.includes(user.email) || 
+      c.campaign_manager === user.email
+    );
+  }, [allCampaigns, user, isAdmin]);
 
   const { data: funnelConfigs = [] } = useQuery({
     queryKey: ['funnel-configs'],
@@ -147,12 +160,16 @@ export default function SalesPipeline() {
     return clients.filter(c => {
       const matchesStage = (c.funnel_stage || 'lead') === stageId;
       
-      // Se "Todas as Campanhas", mostrar todos os clientes
+      // Se "Todas as Campanhas"
       if (selectedCampaign === 'all') {
-        return matchesStage;
+        // Mostrar clientes sem campanha OU de campanhas que o usuário tem acesso
+        if (!c.campaign_id) return matchesStage;
+        
+        const campaignIds = campaigns.map(camp => camp.id);
+        return matchesStage && campaignIds.includes(c.campaign_id);
       }
       
-      // Se campanha específica, filtrar por campaign_id
+      // Se campanha específica selecionada
       const matchesCampaign = c.campaign_id === selectedCampaign;
       return matchesStage && matchesCampaign;
     });
@@ -163,9 +180,14 @@ export default function SalesPipeline() {
     count: getClientsByStage(stage.id).length,
   }));
 
-  const filteredClients = selectedCampaign === 'all' 
-    ? clients 
-    : clients.filter(c => c.campaign_id === selectedCampaign);
+  const filteredClients = React.useMemo(() => {
+    if (selectedCampaign === 'all') {
+      // Mostrar clientes sem campanha OU de campanhas acessíveis
+      const campaignIds = campaigns.map(c => c.id);
+      return clients.filter(c => !c.campaign_id || campaignIds.includes(c.campaign_id));
+    }
+    return clients.filter(c => c.campaign_id === selectedCampaign);
+  }, [clients, selectedCampaign, campaigns]);
 
   const totalValue = filteredClients.reduce((sum, c) => {
     const stageMultipliers = {
