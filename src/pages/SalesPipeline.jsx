@@ -66,22 +66,12 @@ export default function SalesPipeline() {
     loadUser();
   }, []);
 
+  const isAdmin = user?.role === 'admin' || userAccess?.roles?.includes('administrador');
+
   const canEditFunnel = user?.role === 'admin' || 
       userAccess?.roles?.includes('administrador') ||
       userAccess?.roles?.includes('gerente') ||
       userAccess?.roles?.includes('agente_comercial');
-
-    // Verificar se pode editar funil (via CampaignAccess ou permissão de role)
-    const canEditFunnelViaAccess = React.useMemo(() => {
-      if (!selectedCampaign || selectedCampaign === 'all') return canEditFunnel;
-      const access = campaignAccesses.find(ca => 
-        ca.campaign_id === selectedCampaign && 
-        ca.user_email === user?.email
-      );
-      return access?.can_edit_funnel || canEditFunnel;
-    }, [campaignAccesses, selectedCampaign, user, canEditFunnel]);
-
-  const isAdmin = user?.role === 'admin' || userAccess?.roles?.includes('administrador');
 
   // Notificar e persistir mudança de campanha
   React.useEffect(() => {
@@ -168,6 +158,16 @@ export default function SalesPipeline() {
         c.campaign_manager === user.email
       );
     }, [allCampaigns, user, isAdmin, userCampaignIds]);
+
+  // Verificar se pode editar funil (via CampaignAccess ou permissão de role)
+  const canEditFunnelViaAccess = React.useMemo(() => {
+    if (!selectedCampaign || selectedCampaign === 'all') return canEditFunnel;
+    const access = campaignAccesses.find(ca => 
+      ca.campaign_id === selectedCampaign && 
+      ca.user_email === user?.email
+    );
+    return access?.can_edit_funnel || canEditFunnel;
+  }, [campaignAccesses, selectedCampaign, user, canEditFunnel]);
 
   const { data: funnelConfigs = [] } = useQuery({
     queryKey: ['funnel-configs'],
