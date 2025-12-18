@@ -67,9 +67,19 @@ export default function SalesPipeline() {
   }, []);
 
   const canEditFunnel = user?.role === 'admin' || 
-    userAccess?.roles?.includes('administrador') ||
-    userAccess?.roles?.includes('gerente') ||
-    userAccess?.roles?.includes('agente_comercial');
+      userAccess?.roles?.includes('administrador') ||
+      userAccess?.roles?.includes('gerente') ||
+      userAccess?.roles?.includes('agente_comercial');
+
+    // Verificar se pode editar funil (via CampaignAccess ou permissão de role)
+    const canEditFunnelViaAccess = React.useMemo(() => {
+      if (!selectedCampaign || selectedCampaign === 'all') return canEditFunnel;
+      const access = campaignAccesses.find(ca => 
+        ca.campaign_id === selectedCampaign && 
+        ca.user_email === user?.email
+      );
+      return access?.can_edit_funnel || canEditFunnel;
+    }, [campaignAccesses, selectedCampaign, user, canEditFunnel]);
 
   const isAdmin = user?.role === 'admin' || userAccess?.roles?.includes('administrador');
 
@@ -122,26 +132,42 @@ export default function SalesPipeline() {
   });
 
   // Buscar campanhas (RLS já filtra por permissão do usuário)
-  const { data: allCampaigns = [] } = useQuery({
-    queryKey: ['pipeline-campaigns'],
-    queryFn: () => base44.entities.Campaign.list('-created_date'),
-  });
+    const { data: allCampaigns = [] } = useQuery({
+      queryKey: ['pipeline-campaigns'],
+      queryFn: () => base44.entities.Campaign.list('-created_date'),
+    });
 
-  // Filtrar apenas campanhas ativas onde o usuário está atribuído
-  const campaigns = React.useMemo(() => {
-    if (!user) return [];
-    
-    const activeCampaigns = allCampaigns.filter(c => c.status === 'ativa');
-    
-    // Admin vê todas
-    if (isAdmin) return activeCampaigns;
-    
-    // Outros usuários veem apenas onde estão atribuídos ou são gerentes
-    return activeCampaigns.filter(c => 
-      c.assigned_agents?.includes(user.email) || 
-      c.campaign_manager === user.email
-    );
-  }, [allCampaigns, user, isAdmin]);
+    // Buscar acessos de campanha (visível para todos)
+    const { data: campaignAccesses = [] } = useQuery({
+      queryKey: ['campaign-accesses'],
+      queryFn: () => base44.entities.CampaignAccess.list(),
+    });
+
+    // Verificar se o usuário tem acesso via CampaignAccess ou é admin
+    const userCampaignIds = React.useMemo(() => {
+      if (!user) return [];
+      if (isAdmin) return allCampaigns.map(c => c.id);
+      return campaignAccesses
+        .filter(ca => ca.user_email === user.email)
+        .map(ca => ca.campaign_id);
+    }, [campaignAccesses, user, isAdmin, allCampaigns]);
+
+    // Filtrar apenas campanhas ativas onde o usuário está atribuído
+    const campaigns = React.useMemo(() => {
+      if (!user) return [];
+
+      const activeCampaigns = allCampaigns.filter(c => c.status === 'ativa');
+
+      // Admin vê todas
+      if (isAdmin) return activeCampaigns;
+
+      // Outros usuários veem via CampaignAccess, assigned ou manager
+      return activeCampaigns.filter(c => 
+        userCampaignIds.includes(c.id) ||
+        c.assigned_agents?.includes(user.email) || 
+        c.campaign_manager === user.email
+      );
+    }, [allCampaigns, user, isAdmin, userCampaignIds]);
 
   const { data: funnelConfigs = [] } = useQuery({
     queryKey: ['funnel-configs'],
@@ -171,7 +197,7 @@ export default function SalesPipeline() {
 
   const handleDragEnd = (result) => {
     if (!result.destination) return;
-    if (!canEditFunnel) return;
+    if (!canEditFunnelViaAccess) return;
     
     const clientId = result.draggableId;
     const newStage = result.destination.droppableId;
@@ -246,7 +272,7 @@ export default function SalesPipeline() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Funil de Vendas</h1>
           <p className="text-slate-500">
-            {canEditFunnel 
+            {canEditFunnelViaAccess 
               ? 'Arraste os clientes entre as etapas' 
               : 'Visualização do funil (sem permissão para editar)'}
           </p>
