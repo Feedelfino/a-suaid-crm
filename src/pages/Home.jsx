@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
 import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
 export default function Home() {
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const { getDisplayName } = useUserDisplayName();
 
@@ -114,12 +115,13 @@ export default function Home() {
                 Ver Agenda
               </Button>
             </Link>
-            <Link to={createPageUrl('SalesPipeline')}>
-              <Button className="bg-emerald-400 text-slate-900 hover:bg-emerald-500 shadow-lg font-semibold">
-                <GitBranch className="w-4 h-4 mr-2" />
-                Funil de Vendas
-              </Button>
-            </Link>
+            <Button 
+              onClick={() => navigate(createPageUrl('SalesPipeline'))}
+              className="bg-emerald-400 text-slate-900 hover:bg-emerald-500 shadow-lg font-semibold"
+            >
+              <GitBranch className="w-4 h-4 mr-2" />
+              Funil de Vendas
+            </Button>
           </div>
         </div>
       </div>
