@@ -121,28 +121,19 @@ export default function SalesPipeline() {
     queryFn: () => base44.entities.Appointment.list('-date', 200),
   });
 
-  // Buscar campanhas (RLS já filtra por permissão do usuário)
+  // Buscar todas as campanhas (RLS agora permite todos verem)
     const { data: allCampaigns = [] } = useQuery({
       queryKey: ['pipeline-campaigns'],
       queryFn: () => base44.entities.Campaign.list('-created_date'),
     });
 
-    // Buscar acessos de campanha (visível para todos)
+    // Buscar acessos de campanha
     const { data: campaignAccesses = [] } = useQuery({
       queryKey: ['campaign-accesses'],
       queryFn: () => base44.entities.CampaignAccess.list(),
     });
 
-    // Verificar se o usuário tem acesso via CampaignAccess ou é admin
-    const userCampaignIds = React.useMemo(() => {
-      if (!user) return [];
-      if (isAdmin) return allCampaigns.map(c => c.id);
-      return campaignAccesses
-        .filter(ca => ca.user_email === user.email)
-        .map(ca => ca.campaign_id);
-    }, [campaignAccesses, user, isAdmin, allCampaigns]);
-
-    // Filtrar apenas campanhas ativas onde o usuário está atribuído
+    // Filtrar apenas campanhas ativas onde o usuário tem acesso
     const campaigns = React.useMemo(() => {
       if (!user) return [];
 
@@ -151,23 +142,38 @@ export default function SalesPipeline() {
       // Admin vê todas
       if (isAdmin) return activeCampaigns;
 
-      // Outros usuários veem via CampaignAccess, assigned ou manager
+      // Outros usuários veem se:
+      // 1. Estão em assigned_agents
+      // 2. São campaign_manager
+      // 3. Têm registro em CampaignAccess
+      const userCampaignAccessIds = campaignAccesses
+        .filter(ca => ca.user_email === user.email)
+        .map(ca => ca.campaign_id);
+
       return activeCampaigns.filter(c => 
-        userCampaignIds.includes(c.id) ||
         c.assigned_agents?.includes(user.email) || 
-        c.campaign_manager === user.email
+        c.campaign_manager === user.email ||
+        userCampaignAccessIds.includes(c.id)
       );
-    }, [allCampaigns, user, isAdmin, userCampaignIds]);
+    }, [allCampaigns, user, isAdmin, campaignAccesses]);
 
   // Verificar se pode editar funil (via CampaignAccess ou permissão de role)
   const canEditFunnelViaAccess = React.useMemo(() => {
-    if (!selectedCampaign || selectedCampaign === 'all') return canEditFunnel;
+    if (!user || !selectedCampaign || selectedCampaign === 'all') return canEditFunnel;
+    
+    const selectedCamp = campaigns.find(c => c.id === selectedCampaign);
+    
+    // Se é manager da campanha ou admin, pode editar
+    if (isAdmin || selectedCamp?.campaign_manager === user.email) return true;
+    
+    // Verificar CampaignAccess
     const access = campaignAccesses.find(ca => 
       ca.campaign_id === selectedCampaign && 
-      ca.user_email === user?.email
+      ca.user_email === user.email
     );
+    
     return access?.can_edit_funnel || canEditFunnel;
-  }, [campaignAccesses, selectedCampaign, user, canEditFunnel]);
+  }, [campaignAccesses, selectedCampaign, user, canEditFunnel, campaigns, isAdmin]);
 
   const { data: funnelConfigs = [] } = useQuery({
     queryKey: ['funnel-configs'],
