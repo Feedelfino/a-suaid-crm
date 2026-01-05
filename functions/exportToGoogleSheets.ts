@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
-import { SignJWT } from 'npm:jose@5.2.0';
+import { SignJWT, importPKCS8 } from 'npm:jose@5.2.0';
 
 const SPREADSHEET_ID = '13SiGYKT3TwRXjhnogdHAMGXZrWjT15aiEQONn-r54qE';
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
@@ -15,43 +15,21 @@ async function getAccessToken() {
   // Garantir que as quebras de linha estejam corretas
   privateKey = privateKey.replace(/\\n/g, '\n');
 
-  // Extrair a chave PEM (remover header e footer)
-  const pemHeader = '-----BEGIN PRIVATE KEY-----';
-  const pemFooter = '-----END PRIVATE KEY-----';
-  const pemContents = privateKey
-    .replace(pemHeader, '')
-    .replace(pemFooter, '')
-    .replace(/\s/g, '');
-  
-  // Converter base64 para ArrayBuffer
-  const binaryString = atob(pemContents);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
+  // Importar chave privada usando jose (método robusto e seguro)
+  const cryptoKey = await importPKCS8(privateKey, 'RS256');
 
-  const now = Math.floor(Date.now() / 1000);
-  const expiry = now + 3600;
-
-  // Importar chave privada
-  const cryptoKey = await crypto.subtle.importKey(
-    'pkcs8',
-    bytes.buffer,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-
-  // Criar JWT
-  const jwt = await new SignJWT({
-    iss: serviceAccountEmail,
-    scope: SCOPES,
-    aud: 'https://oauth2.googleapis.com/token',
-    exp: expiry,
-    iat: now,
-  })
-    .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
+  // Criar JWT com jose
+  const jwt = await new SignJWT({})
+    .setProtectedHeader({ alg: 'RS256' })
+    .setIssuer(serviceAccountEmail)
+    .setSubject(serviceAccountEmail)
+    .setAudience('https://oauth2.googleapis.com/token')
+    .setIssuedAt()
+    .setExpirationTime('1h')
     .sign(cryptoKey);
+
+  // Adicionar o claim scope manualmente no body da requisição
+  const jwtPayload = jwt;
 
   // Trocar JWT por access token
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -59,12 +37,15 @@ async function getAccessToken() {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
+      assertion: jwtPayload,
+      scope: SCOPES,
     }),
   });
 
   if (!tokenResponse.ok) {
-    throw new Error('Erro ao obter token de acesso do Google');
+    const errorDetails = await tokenResponse.text();
+    console.error('Erro detalhado do Google:', errorDetails);
+    throw new Error(`Erro ao obter token de acesso do Google: ${tokenResponse.status} - ${errorDetails}`);
   }
 
   const tokenData = await tokenResponse.json();
