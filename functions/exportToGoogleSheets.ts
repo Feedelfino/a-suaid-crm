@@ -15,8 +15,32 @@ async function getAccessToken() {
   // Garantir que as quebras de linha estejam corretas
   privateKey = privateKey.replace(/\\n/g, '\n');
 
+  // Extrair a chave PEM (remover header e footer)
+  const pemHeader = '-----BEGIN PRIVATE KEY-----';
+  const pemFooter = '-----END PRIVATE KEY-----';
+  const pemContents = privateKey
+    .replace(pemHeader, '')
+    .replace(pemFooter, '')
+    .replace(/\s/g, '');
+  
+  // Converter base64 para ArrayBuffer
+  const binaryString = atob(pemContents);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
   const now = Math.floor(Date.now() / 1000);
   const expiry = now + 3600;
+
+  // Importar chave privada
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8',
+    bytes.buffer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
 
   // Criar JWT
   const jwt = await new SignJWT({
@@ -27,13 +51,7 @@ async function getAccessToken() {
     iat: now,
   })
     .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
-    .sign(await crypto.subtle.importKey(
-      'pkcs8',
-      new TextEncoder().encode(privateKey),
-      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-      false,
-      ['sign']
-    ));
+    .sign(cryptoKey);
 
   // Trocar JWT por access token
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
