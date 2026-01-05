@@ -6,11 +6,14 @@ const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
 
 async function getAccessToken() {
   const serviceAccountEmail = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_EMAIL');
-  const privateKey = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY');
+  let privateKey = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY');
 
   if (!serviceAccountEmail || !privateKey) {
     throw new Error('Credenciais do Google não configuradas');
   }
+
+  // Garantir que as quebras de linha estejam corretas
+  privateKey = privateKey.replace(/\\n/g, '\n');
 
   const now = Math.floor(Date.now() / 1000);
   const expiry = now + 3600;
@@ -51,7 +54,7 @@ async function getAccessToken() {
 }
 
 async function appendToSheet(accessToken, values) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/Sheet1!A:E:append?valueInputOption=USER_ENTERED`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/Página1!A:H:append?valueInputOption=USER_ENTERED`;
 
   const response = await fetch(url, {
     method: 'POST',
@@ -67,9 +70,12 @@ async function appendToSheet(accessToken, values) {
   if (!response.ok) {
     const error = await response.text();
     if (response.status === 403) {
-      throw new Error('Erro de Permissão: Verifique se a planilha foi compartilhada com o e-mail da automação (suaidbase@caramel-anvil-483414-n9.iam.gserviceaccount.com)');
+      throw new Error('❌ Erro de Permissão: Verifique se a planilha foi compartilhada com suaidbase@caramel-anvil-483414-n9.iam.gserviceaccount.com com permissão de Edição');
     }
-    throw new Error(`Erro ao exportar para Google Sheets: ${error}`);
+    if (response.status === 404) {
+      throw new Error('❌ Planilha não encontrada. Verifique se o ID está correto e se a aba "Página1" existe');
+    }
+    throw new Error(`❌ Erro ao exportar: ${error}`);
   }
 
   return await response.json();
