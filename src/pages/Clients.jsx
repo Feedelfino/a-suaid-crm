@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { 
   Search, Plus, User, Building2, Phone, Mail, 
-  Filter, MoreVertical, Eye, Edit, Trash2 
+  Filter, MoreVertical, Eye, Edit, Trash2, FileSpreadsheet
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ export default function Clients() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [user, setUser] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -91,6 +92,23 @@ export default function Clients() {
     }
   };
 
+  const handleExportToGoogleSheets = async () => {
+    setIsExporting(true);
+    try {
+      const response = await base44.functions.invoke('exportToGoogleSheets', {});
+      
+      if (response.data.error) {
+        alert(`Erro: ${response.data.error}`);
+      } else {
+        alert(`✅ ${response.data.message}`);
+      }
+    } catch (error) {
+      alert(`Erro ao exportar: ${error.message || 'Erro desconhecido'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -99,12 +117,23 @@ export default function Clients() {
           <h1 className="text-2xl font-bold text-slate-800">Cadastros</h1>
           <p className="text-slate-500">Gerencie todos os seus clientes</p>
         </div>
-        <Link to={createPageUrl('ClientForm')}>
-          <Button className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]">
-            <Plus className="w-4 h-4 mr-2" />
-            Novo Cliente
+        <div className="flex gap-3">
+          <Button 
+            variant="outline"
+            onClick={handleExportToGoogleSheets}
+            disabled={isExporting}
+            className="gap-2"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            {isExporting ? 'Exportando...' : 'Exportar para Google Sheets'}
           </Button>
-        </Link>
+          <Link to={createPageUrl('ClientForm')}>
+            <Button className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]">
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Cliente
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
