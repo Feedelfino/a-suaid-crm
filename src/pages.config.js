@@ -1,53 +1,53 @@
-import AccessDenied from './pages/AccessDenied';
-import AccessPending from './pages/AccessPending';
-import Admin from './pages/Admin';
-import AgentPerformance from './pages/AgentPerformance';
-import AppointmentForm from './pages/AppointmentForm';
-import Campaigns from './pages/Campaigns';
-import Chat from './pages/Chat';
-import ClientDetails from './pages/ClientDetails';
-import ClientForm from './pages/ClientForm';
-import Clients from './pages/Clients';
-import Dashboard from './pages/Dashboard';
-import DataImport from './pages/DataImport';
-import HelpCenter from './pages/HelpCenter';
 import Home from './pages/Home';
 import Interactions from './pages/Interactions';
-import MigrationControl from './pages/MigrationControl';
-import Notes from './pages/Notes';
-import Renewals from './pages/Renewals';
-import RenewalsDashboard from './pages/RenewalsDashboard';
-import Reports from './pages/Reports';
-import SalesPipeline from './pages/SalesPipeline';
+import Clients from './pages/Clients';
+import ClientForm from './pages/ClientForm';
+import ClientDetails from './pages/ClientDetails';
 import Schedule from './pages/Schedule';
+import AppointmentForm from './pages/AppointmentForm';
+import Dashboard from './pages/Dashboard';
+import Campaigns from './pages/Campaigns';
+import Reports from './pages/Reports';
+import DataImport from './pages/DataImport';
+import Admin from './pages/Admin';
 import Tasks from './pages/Tasks';
+import AccessPending from './pages/AccessPending';
+import AccessDenied from './pages/AccessDenied';
+import SalesPipeline from './pages/SalesPipeline';
+import Notes from './pages/Notes';
+import Chat from './pages/Chat';
+import Renewals from './pages/Renewals';
+import AgentPerformance from './pages/AgentPerformance';
+import HelpCenter from './pages/HelpCenter';
+import RenewalsDashboard from './pages/RenewalsDashboard';
+import MigrationControl from './pages/MigrationControl';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
-    "AccessDenied": AccessDenied,
-    "AccessPending": AccessPending,
-    "Admin": Admin,
-    "AgentPerformance": AgentPerformance,
-    "AppointmentForm": AppointmentForm,
-    "Campaigns": Campaigns,
-    "Chat": Chat,
-    "ClientDetails": ClientDetails,
-    "ClientForm": ClientForm,
-    "Clients": Clients,
-    "Dashboard": Dashboard,
-    "DataImport": DataImport,
-    "HelpCenter": HelpCenter,
     "Home": Home,
     "Interactions": Interactions,
-    "MigrationControl": MigrationControl,
-    "Notes": Notes,
-    "Renewals": Renewals,
-    "RenewalsDashboard": RenewalsDashboard,
-    "Reports": Reports,
-    "SalesPipeline": SalesPipeline,
+    "Clients": Clients,
+    "ClientForm": ClientForm,
+    "ClientDetails": ClientDetails,
     "Schedule": Schedule,
+    "AppointmentForm": AppointmentForm,
+    "Dashboard": Dashboard,
+    "Campaigns": Campaigns,
+    "Reports": Reports,
+    "DataImport": DataImport,
+    "Admin": Admin,
     "Tasks": Tasks,
+    "AccessPending": AccessPending,
+    "AccessDenied": AccessDenied,
+    "SalesPipeline": SalesPipeline,
+    "Notes": Notes,
+    "Chat": Chat,
+    "Renewals": Renewals,
+    "AgentPerformance": AgentPerformance,
+    "HelpCenter": HelpCenter,
+    "RenewalsDashboard": RenewalsDashboard,
+    "MigrationControl": MigrationControl,
 }
 
 export const pagesConfig = {

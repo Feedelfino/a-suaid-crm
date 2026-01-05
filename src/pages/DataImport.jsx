@@ -114,18 +114,6 @@ export default function DataImport() {
   const [showEditor, setShowEditor] = useState(false);
   const [duplicatesInSystem, setDuplicatesInSystem] = useState([]);
   const [importMode, setImportMode] = useState('clients'); // 'clients' ou 'certificates'
-  const [isExporting, setIsExporting] = useState(false);
-  const [user, setUser] = useState(null);
-
-  React.useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const userData = await base44.auth.me();
-        setUser(userData);
-      } catch (e) {}
-    };
-    loadUser();
-  }, []);
 
   // Buscar clientes e certificados existentes para checar duplicados
   const { data: existingClients = [] } = useQuery({
@@ -471,77 +459,20 @@ export default function DataImport() {
     setDuplicatesInSystem([]);
   };
 
-  const handleExportDatabase = async () => {
-    setIsExporting(true);
-    try {
-      const response = await base44.functions.invoke('exportDatabase', {});
-      
-      // Response.data contém o ArrayBuffer
-      const blob = new Blob([response.data], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-      });
-      
-      // Download
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      const timestamp = new Date().toISOString().split('T')[0];
-      link.download = `backup_crm_${timestamp}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      setImportStatus({ 
-        type: 'success', 
-        message: 'Base de dados exportada com sucesso!' 
-      });
-    } catch (error) {
-      console.error('Erro ao exportar:', error);
-      setImportStatus({ 
-        type: 'error', 
-        message: error.response?.data?.error || error.message || 'Erro ao exportar base de dados' 
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Banco de Dados</h1>
           <p className="text-slate-500">Importe e limpe dados de planilhas e PDFs</p>
         </div>
-        <div className="flex gap-3">
-          {user?.role === 'admin' && (
-            <Button 
-              onClick={handleExportDatabase}
-              disabled={isExporting}
-              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-            >
-              {isExporting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Exportando...
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4 mr-2" />
-                  Exportar Tudo
-                </>
-              )}
-            </Button>
-          )}
-          {showEditor && (
-            <Button variant="outline" onClick={resetUpload}>
-              <X className="w-4 h-4 mr-2" />
-              Nova Importação
-            </Button>
-          )}
-        </div>
+        {showEditor && (
+          <Button variant="outline" onClick={resetUpload}>
+            <X className="w-4 h-4 mr-2" />
+            Nova Importação
+          </Button>
+        )}
       </div>
 
       {/* Status Messages */}
