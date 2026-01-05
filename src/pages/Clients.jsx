@@ -6,8 +6,9 @@ import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { 
   Search, Plus, User, Building2, Phone, Mail, 
-  Filter, MoreVertical, Eye, Edit, Trash2, FileSpreadsheet
+  Filter, MoreVertical, Eye, Edit, Trash2, FileSpreadsheet, Upload
 } from 'lucide-react';
+import ImportFromSheetsDialog from '@/components/data/ImportFromSheetsDialog';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
