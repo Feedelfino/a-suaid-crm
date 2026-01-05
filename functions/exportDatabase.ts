@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
       'Email': a.email,
       'Agente': a.agent,
       'Email Agente': a.agent_email,
-      'Participantes': a.participants?.join(', '),
+      'Participantes': Array.isArray(a.participants) ? a.participants.filter(Boolean).join(', ') : '',
       'Tipo Compromisso': a.appointment_type,
       'Data': a.date,
       'Horário': a.time,
@@ -145,7 +145,7 @@ Deno.serve(async (req) => {
       'Meta Quantidade': c.goal_quantity,
       'Produto Alvo': c.target_product,
       'Região Alvo': c.target_region,
-      'Agentes Atribuídos': c.assigned_agents?.join(', '),
+      'Agentes Atribuídos': Array.isArray(c.assigned_agents) ? c.assigned_agents.filter(Boolean).join(', ') : '',
       'Gerente Campanha': c.campaign_manager,
       'Status': c.status,
       'Valor Alcançado': c.achieved_value,
@@ -197,12 +197,19 @@ Deno.serve(async (req) => {
     const tasksSheet = XLSX.utils.json_to_sheet(tasksData);
     XLSX.utils.book_append_sheet(workbook, tasksSheet, 'Tarefas');
 
-    // Generate Excel file as array
-    const excelBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+    // Generate Excel file as base64 then convert
+    const excelBase64 = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
+    
+    // Convert base64 to Uint8Array
+    const binaryString = atob(excelBase64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
 
     // Return as downloadable file
     const timestamp = new Date().toISOString().split('T')[0];
-    return new Response(new Uint8Array(excelBuffer), {
+    return new Response(bytes, {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

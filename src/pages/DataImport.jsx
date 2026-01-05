@@ -474,23 +474,12 @@ export default function DataImport() {
   const handleExportDatabase = async () => {
     setIsExporting(true);
     try {
-      // Get function URL and call directly with fetch for binary response
-      const functionUrl = `${window.location.origin}/api/functions/exportDatabase`;
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}),
-        credentials: 'include',
+      const response = await base44.functions.invoke('exportDatabase', {});
+      
+      // Response.data contém o ArrayBuffer
+      const blob = new Blob([response.data], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
       });
-
-      if (!response.ok) {
-        throw new Error('Erro ao exportar dados');
-      }
-
-      // Get binary data
-      const blob = await response.blob();
       
       // Download
       const url = window.URL.createObjectURL(blob);
@@ -508,9 +497,10 @@ export default function DataImport() {
         message: 'Base de dados exportada com sucesso!' 
       });
     } catch (error) {
+      console.error('Erro ao exportar:', error);
       setImportStatus({ 
         type: 'error', 
-        message: error.message || 'Erro ao exportar base de dados' 
+        message: error.response?.data?.error || error.message || 'Erro ao exportar base de dados' 
       });
     } finally {
       setIsExporting(false);
