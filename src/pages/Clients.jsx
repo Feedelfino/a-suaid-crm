@@ -117,7 +117,8 @@ export default function Clients() {
           <h1 className="text-2xl font-bold text-slate-800">Cadastros</h1>
           <p className="text-slate-500">Gerencie todos os seus clientes</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
+          <ImportFromSheetsDialog onImportComplete={refetch} />
           <Button 
             variant="outline"
             onClick={handleExportToGoogleSheets}
@@ -125,7 +126,7 @@ export default function Clients() {
             className="gap-2"
           >
             <FileSpreadsheet className="w-4 h-4" />
-            {isExporting ? 'Exportando...' : 'Exportar para Google Sheets'}
+            {isExporting ? 'Exportando...' : 'Exportar'}
           </Button>
           <Link to={createPageUrl('ClientForm')}>
             <Button className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]">
