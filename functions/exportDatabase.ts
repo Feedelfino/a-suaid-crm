@@ -197,12 +197,12 @@ Deno.serve(async (req) => {
     const tasksSheet = XLSX.utils.json_to_sheet(tasksData);
     XLSX.utils.book_append_sheet(workbook, tasksSheet, 'Tarefas');
 
-    // Generate Excel file
-    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    // Generate Excel file as array
+    const excelBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
 
     // Return as downloadable file
     const timestamp = new Date().toISOString().split('T')[0];
-    return new Response(excelBuffer, {
+    return new Response(new Uint8Array(excelBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
