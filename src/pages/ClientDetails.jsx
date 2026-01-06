@@ -38,14 +38,18 @@ export default function ClientDetails() {
     loadUser();
   }, []);
 
-  const { data: client, isLoading } = useQuery({
+  const { data: clients = [], isLoading } = useQuery({
     queryKey: ['client', clientId],
     queryFn: async () => {
-      const clients = await base44.entities.Client.list();
-      return clients.find(c => c.id === clientId);
+      if (!clientId) return [];
+      const allClients = await base44.entities.Client.list();
+      const found = allClients.filter(c => c.id === clientId);
+      return found;
     },
     enabled: !!clientId,
   });
+
+  const client = clients[0];
 
   const { data: interactions = [] } = useQuery({
     queryKey: ['interactions', clientId],
