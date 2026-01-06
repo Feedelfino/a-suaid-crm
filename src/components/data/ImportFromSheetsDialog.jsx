@@ -209,6 +209,19 @@ export default function ImportFromSheetsDialog({ onImportComplete }) {
                             {result.results.skipped} ignorados
                           </Badge>
                         )}
+                        {result.mergeResults?.merged > 0 && (
+                          <Badge className="bg-amber-600">
+                            🔄 {result.mergeResults.merged} duplicatas unificadas
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                    {result.mergeResults?.details?.length > 0 && (
+                      <div className="mt-3 text-xs text-slate-600 bg-slate-50 rounded p-2">
+                        <p className="font-semibold mb-1">Unificações realizadas:</p>
+                        {result.mergeResults.details.slice(0, 3).map((detail, i) => (
+                          <p key={i}>• {detail.kept} ← {detail.deleted} ({detail.reason})</p>
+                        ))}
                       </div>
                     )}
                     {result.results?.errors?.length > 0 && (

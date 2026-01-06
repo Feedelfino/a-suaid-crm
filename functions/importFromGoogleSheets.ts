@@ -255,10 +255,32 @@ Deno.serve(async (req) => {
     }
 
     console.log("✅ Importação concluída!");
+    
+    // Auto-merge de duplicatas após importação
+    let mergeResults = null;
+    if (results.created > 0) {
+      console.log("🔄 Executando auto-merge de duplicatas...");
+      try {
+        // Buscar IDs dos clientes recém-criados
+        const recentClients = await base44.entities.Client.list('-created_date', results.created);
+        const newClientIds = recentClients.map(c => c.id);
+        
+        const mergeResponse = await base44.functions.invoke('autoMergeDuplicates', {
+          newClientIds,
+        });
+        
+        mergeResults = mergeResponse.data;
+      } catch (err) {
+        console.error("Erro no auto-merge:", err.message);
+      }
+    }
+    
     return Response.json({
       success: true,
-      message: `Importação concluída: ${results.created} criados, ${results.updated} atualizados, ${results.skipped} ignorados`,
+      message: `Importação concluída: ${results.created} criados, ${results.updated} atualizados, ${results.skipped} ignorados` +
+               (mergeResults?.merged > 0 ? ` • ${mergeResults.merged} duplicata(s) unificada(s)` : ''),
       results,
+      mergeResults,
       limits: {
         maxRowsPerImport: LIMITS.maxRowsPerRequest,
         maxRowsPerDay: LIMITS.maxRowsPerDay,

@@ -69,7 +69,16 @@ export default function ClientForm() {
       if (clientId) {
         await base44.entities.Client.update(clientId, formData);
       } else {
-        await base44.entities.Client.create(formData);
+        const newClient = await base44.entities.Client.create(formData);
+        
+        // Auto-verificar duplicatas após criar cliente manualmente
+        try {
+          await base44.functions.invoke('autoMergeDuplicates', {
+            newClientIds: [newClient.id],
+          });
+        } catch (err) {
+          console.log('Auto-merge não executado:', err);
+        }
       }
       navigate(createPageUrl('Clients'));
     } catch (error) {
