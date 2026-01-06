@@ -38,17 +38,21 @@ export default function ClientDetails() {
     loadUser();
   }, []);
 
-  const { data: clients = [], isLoading } = useQuery({
-    queryKey: ['client', clientId],
-    queryFn: () => base44.entities.Client.filter({ id: clientId }),
+  const { data: client, isLoading, error } = useQuery({
+    queryKey: ['client-details', clientId],
+    queryFn: async () => {
+      const allClients = await base44.entities.Client.list();
+      const found = allClients.find(c => c.id === clientId);
+      return found || null;
+    },
     enabled: !!clientId && !!user,
     staleTime: Infinity,
+    gcTime: Infinity,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+    retry: false,
   });
-
-  const client = clients[0];
 
   const { data: interactions = [] } = useQuery({
     queryKey: ['interactions', clientId],
@@ -83,7 +87,7 @@ export default function ClientDetails() {
     },
   });
 
-  if (isLoading) {
+  if (isLoading || !user) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin w-8 h-8 border-4 border-[#6B2D8B] border-t-transparent rounded-full" />
@@ -91,7 +95,7 @@ export default function ClientDetails() {
     );
   }
 
-  if (!client) {
+  if (!isLoading && !client) {
     return (
       <div className="text-center py-16">
         <User className="w-16 h-16 mx-auto mb-4 text-slate-300" />
