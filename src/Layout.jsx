@@ -89,14 +89,11 @@ export default function Layout({ children, currentPageName }) {
     checkAccess();
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      await base44.auth.logout();
-      window.location.reload();
-    } catch (error) {
-      console.error('Erro ao deslogar:', error);
-      window.location.reload();
-    }
+  const handleLogout = () => {
+    // Limpar sessão e redirecionar diretamente
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = window.location.origin;
   };
 
   // Loading state
