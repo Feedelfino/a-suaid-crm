@@ -69,7 +69,7 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading, clientI
   const [formData, setFormData] = useState({
     interaction_type: '',
     contact_method: '',
-    product_offered: '',
+    product_offered: [],
     tabulation: '',
     sale_value: '',
     had_discount: false,
@@ -218,21 +218,36 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading, clientI
           </Select>
         </div>
 
-        <div className="space-y-2">
-          <Label>Produto Oferecido</Label>
-          <Select 
-            value={formData.product_offered} 
-            onValueChange={(v) => handleChange('product_offered', v)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione..." />
-            </SelectTrigger>
-            <SelectContent>
-              {PRODUCTS.map(p => (
-                <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="space-y-2 md:col-span-2">
+          <Label>Produtos Oferecidos (Seleção Múltipla)</Label>
+          <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto bg-white">
+            {PRODUCTS.map(product => (
+              <label 
+                key={product.value}
+                className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
+                  formData.product_offered.includes(product.value) 
+                    ? 'bg-[#6B2D8B]/10 border border-[#6B2D8B]/20' 
+                    : 'hover:bg-slate-50'
+                }`}
+              >
+                <Checkbox
+                  checked={formData.product_offered.includes(product.value)}
+                  onCheckedChange={(checked) => {
+                    const newProducts = checked
+                      ? [...formData.product_offered, product.value]
+                      : formData.product_offered.filter(p => p !== product.value);
+                    handleChange('product_offered', newProducts);
+                  }}
+                />
+                <span className="text-sm">{product.label}</span>
+              </label>
+            ))}
+          </div>
+          {formData.product_offered.length > 0 && (
+            <p className="text-xs text-[#6B2D8B] font-medium">
+              {formData.product_offered.length} produto(s) selecionado(s)
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
