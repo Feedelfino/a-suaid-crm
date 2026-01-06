@@ -9,6 +9,7 @@ import {
   Filter, MoreVertical, Eye, Edit, Trash2, FileSpreadsheet, Upload
 } from 'lucide-react';
 import ImportFromSheetsDialog from '@/components/data/ImportFromSheetsDialog';
+import DuplicateDetector from '@/components/data/DuplicateDetector';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -120,6 +121,7 @@ export default function Clients() {
         </div>
         <div className="flex gap-3 flex-wrap">
           <ImportFromSheetsDialog onImportComplete={refetch} />
+          <DuplicateDetector />
           <Button 
             variant="outline"
             onClick={handleExportToGoogleSheets}

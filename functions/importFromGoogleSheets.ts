@@ -63,6 +63,15 @@ async function readSheet(accessToken, spreadsheetId, sheetName, maxRows) {
   return await response.json();
 }
 
+function detectDataType(headers) {
+  const headerStr = headers.join(' ').toLowerCase();
+  const isRenewal = headerStr.includes('dt_fim') || 
+                    headerStr.includes('validade') || 
+                    headerStr.includes('vencimento') ||
+                    headerStr.includes('expir');
+  return isRenewal ? 'renewal' : 'client';
+}
+
 function mapRowToClient(row, headers) {
   const client = {};
   
@@ -86,6 +95,35 @@ function mapRowToClient(row, headers) {
   });
   
   return client;
+}
+
+function mapRowToCertificate(row, headers) {
+  const cert = {};
+  
+  headers.forEach((header, index) => {
+    const value = row[index];
+    if (!value) return;
+    
+    const headerLower = header.toLowerCase().trim();
+    
+    if (headerLower.includes('cpf')) cert.client_cpf = value;
+    else if (headerLower.includes('cnpj')) cert.client_cnpj = value;
+    else if (headerLower.includes('nome')) cert.client_name = value;
+    else if (headerLower.includes('email')) cert.client_email = value;
+    else if (headerLower.includes('telefone') || headerLower.includes('fone')) cert.client_phone = value;
+    else if (headerLower.includes('tipo')) {
+      const tipo = value.toLowerCase();
+      if (tipo.includes('a1')) cert.certificate_type = tipo.includes('cnpj') ? 'e_cnpj_a1' : 'e_cpf_a1';
+      else if (tipo.includes('a3')) cert.certificate_type = tipo.includes('cnpj') ? 'e_cnpj_a3' : 'e_cpf_a3';
+    }
+    else if (headerLower.includes('emissão') || headerLower.includes('emissao')) cert.issue_date = value;
+    else if (headerLower.includes('dt_fim') || headerLower.includes('validade') || headerLower.includes('vencimento')) {
+      cert.expiry_date = value;
+    }
+    else if (headerLower.includes('agente')) cert.assigned_agent = value;
+  });
+  
+  return cert;
 }
 
 Deno.serve(async (req) => {
@@ -138,46 +176,81 @@ Deno.serve(async (req) => {
 
     const [headers, ...dataRows] = sheetData.values;
     
+    // Detectar tipo de dados (clientes ou renovações)
+    const dataType = detectDataType(headers);
+    console.log(`Tipo de dados detectado: ${dataType}`);
+    
     // Processar dados
     const results = {
       created: 0,
       updated: 0,
       skipped: 0,
       errors: [],
+      dataType,
     };
 
-    for (const row of dataRows) {
-      try {
-        const clientData = mapRowToClient(row, headers);
-        
-        // Validar dados mínimos
-        if (!clientData.client_name || (!clientData.cpf && !clientData.cnpj)) {
-          results.skipped++;
-          continue;
-        }
+    if (dataType === 'renewal') {
+      // Processar renovações (certificados)
+      for (const row of dataRows) {
+        try {
+          const certData = mapRowToCertificate(row, headers);
+          
+          if (!certData.client_name || !certData.expiry_date) {
+            results.skipped++;
+            continue;
+          }
 
-        // Verificar se cliente já existe (por CPF ou CNPJ)
-        let existingClients = [];
-        
-        if (clientData.cpf) {
-          existingClients = await base44.entities.Client.filter({ cpf: clientData.cpf });
-        }
-        
-        if (existingClients.length === 0 && clientData.cnpj) {
-          existingClients = await base44.entities.Client.filter({ cnpj: clientData.cnpj });
-        }
+          // Verificar se certificado já existe
+          let existingCerts = [];
+          if (certData.client_cpf) {
+            existingCerts = await base44.asServiceRole.entities.Certificate.filter({ 
+              client_name: certData.client_name,
+              expiry_date: certData.expiry_date 
+            });
+          }
 
-        if (existingClients.length > 0) {
-          // Atualizar cliente existente
-          await base44.entities.Client.update(existingClients[0].id, clientData);
-          results.updated++;
-        } else {
-          // Criar novo cliente
-          await base44.entities.Client.create(clientData);
-          results.created++;
+          if (existingCerts.length > 0) {
+            await base44.asServiceRole.entities.Certificate.update(existingCerts[0].id, certData);
+            results.updated++;
+          } else {
+            await base44.asServiceRole.entities.Certificate.create(certData);
+            results.created++;
+          }
+        } catch (err) {
+          results.errors.push(`Linha ${dataRows.indexOf(row) + 2}: ${err.message}`);
         }
-      } catch (err) {
-        results.errors.push(`Linha ${dataRows.indexOf(row) + 2}: ${err.message}`);
+      }
+    } else {
+      // Processar clientes normais
+      for (const row of dataRows) {
+        try {
+          const clientData = mapRowToClient(row, headers);
+          
+          if (!clientData.client_name || (!clientData.cpf && !clientData.cnpj)) {
+            results.skipped++;
+            continue;
+          }
+
+          let existingClients = [];
+          
+          if (clientData.cpf) {
+            existingClients = await base44.entities.Client.filter({ cpf: clientData.cpf });
+          }
+          
+          if (existingClients.length === 0 && clientData.cnpj) {
+            existingClients = await base44.entities.Client.filter({ cnpj: clientData.cnpj });
+          }
+
+          if (existingClients.length > 0) {
+            await base44.entities.Client.update(existingClients[0].id, clientData);
+            results.updated++;
+          } else {
+            await base44.entities.Client.create(clientData);
+            results.created++;
+          }
+        } catch (err) {
+          results.errors.push(`Linha ${dataRows.indexOf(row) + 2}: ${err.message}`);
+        }
       }
     }
 
