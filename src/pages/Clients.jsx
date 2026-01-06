@@ -6,13 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { 
   Search, Plus, User, Building2, Phone, Mail, 
-  Filter, MoreVertical, Eye, Edit, Trash2, FileSpreadsheet, Upload, Users
+  Filter, MoreVertical, Eye, Edit, Trash2 
 } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ImportFromSheetsDialog from '@/components/data/ImportFromSheetsDialog';
-import DuplicateDetector from '@/components/data/DuplicateDetector';
-import RenewalClientsView from '@/components/clients/RenewalClientsView';
-import DuplicatesMonitorView from '@/components/clients/DuplicatesMonitorView';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,7 +39,6 @@ export default function Clients() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [user, setUser] = useState(null);
-  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -61,7 +55,6 @@ export default function Clients() {
   const { data: clients = [], refetch } = useQuery({
     queryKey: ['clients'],
     queryFn: () => base44.entities.Client.list('-created_date'),
-    staleTime: 30000, // 30 segundos
   });
 
   const filteredClients = clients.filter(client => {
@@ -98,23 +91,6 @@ export default function Clients() {
     }
   };
 
-  const handleExportToGoogleSheets = async () => {
-    setIsExporting(true);
-    try {
-      const response = await base44.functions.invoke('exportToGoogleSheets', {});
-      
-      if (response.data.error) {
-        alert(`Erro: ${response.data.error}`);
-      } else {
-        alert(`✅ ${response.data.message}`);
-      }
-    } catch (error) {
-      alert(`Erro ao exportar: ${error.message || 'Erro desconhecido'}`);
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -123,53 +99,15 @@ export default function Clients() {
           <h1 className="text-2xl font-bold text-slate-800">Cadastros</h1>
           <p className="text-slate-500">Gerencie todos os seus clientes</p>
         </div>
-        <div className="flex gap-3 flex-wrap">
-          <ImportFromSheetsDialog onImportComplete={refetch} />
-          <DuplicateDetector />
-          <Button 
-            variant="outline"
-            onClick={handleExportToGoogleSheets}
-            disabled={isExporting}
-            className="gap-2"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            {isExporting ? 'Exportando...' : 'Exportar'}
+        <Link to={createPageUrl('ClientForm')}>
+          <Button className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]">
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Cliente
           </Button>
-          <Link to={createPageUrl('ClientForm')}>
-            <Button className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]">
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Cliente
-            </Button>
-          </Link>
-        </div>
+        </Link>
       </div>
 
-      {/* Total Count Card */}
-      <Card className="border-0 shadow-lg bg-gradient-to-r from-[#6B2D8B] to-[#8B4DAB] text-white">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-white/80 text-sm font-medium">Total de Clientes Cadastrados</p>
-              <p className="text-4xl font-bold mt-1">{clients.length}</p>
-            </div>
-            <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center">
-              <Users className="w-8 h-8 text-white" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tabs */}
-      <Tabs defaultValue="all" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
-          <TabsTrigger value="all">Todos os Clientes</TabsTrigger>
-          <TabsTrigger value="renewal">Renovações</TabsTrigger>
-          <TabsTrigger value="duplicates">Monitor de Duplicados</TabsTrigger>
-        </TabsList>
-
-        {/* Tab: Todos os Clientes */}
-        <TabsContent value="all" className="space-y-6">
-          {/* Filters */}
+      {/* Filters */}
       <Card className="border-0 shadow-lg">
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row gap-4">
@@ -326,18 +264,6 @@ export default function Clients() {
           </div>
         )}
       </Card>
-        </TabsContent>
-
-        {/* Tab: Renovações */}
-        <TabsContent value="renewal">
-          <RenewalClientsView clients={clients} />
-        </TabsContent>
-
-        {/* Tab: Monitor de Duplicados */}
-        <TabsContent value="duplicates">
-          <DuplicatesMonitorView clients={clients} />
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }

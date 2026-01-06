@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
-import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Save, User, Building2, Phone, Mail, MapPin } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +18,6 @@ import {
 
 export default function ClientForm() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const urlParams = new URLSearchParams(window.location.search);
   const clientId = urlParams.get('id');
   const [isLoading, setIsLoading] = useState(false);
@@ -37,9 +35,6 @@ export default function ClientForm() {
     lead_status: 'novo',
     lead_source: '',
     notes: '',
-    products: [],
-    dt_fim: '',
-    validade: '',
   });
 
   useEffect(() => {
@@ -73,26 +68,8 @@ export default function ClientForm() {
     try {
       if (clientId) {
         await base44.entities.Client.update(clientId, formData);
-        // Invalidar queries para atualizar todas as views
-        queryClient.invalidateQueries(['clients']);
-        queryClient.invalidateQueries(['clients-renovation']);
-        queryClient.invalidateQueries(['certificates-dashboard']);
-        queryClient.invalidateQueries(['client', clientId]);
       } else {
-        const newClient = await base44.entities.Client.create(formData);
-        
-        // Auto-verificar duplicatas após criar cliente manualmente
-        try {
-          await base44.functions.invoke('autoMergeDuplicates', {
-            newClientIds: [newClient.id],
-          });
-        } catch (err) {
-          console.log('Auto-merge não executado:', err);
-        }
-        
-        // Invalidar queries
-        queryClient.invalidateQueries(['clients']);
-        queryClient.invalidateQueries(['clients-renovation']);
+        await base44.entities.Client.create(formData);
       }
       navigate(createPageUrl('Clients'));
     } catch (error) {
@@ -301,88 +278,10 @@ export default function ClientForm() {
                   rows={4}
                 />
               </div>
-              </CardContent>
-              </Card>
+            </CardContent>
+          </Card>
 
-              {/* Products Multi-Select */}
-              <Card className="border-0 shadow-lg">
-              <CardHeader className="pb-4">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-[#6B2D8B]" />
-                Produtos Vinculados
-              </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Produtos (Múltipla Seleção)</Label>
-                <div className="border rounded-lg p-3 space-y-2 max-h-64 overflow-y-auto bg-slate-50">
-                  {[
-                    { value: 'e_cpf_a1', label: 'e-CPF A1' },
-                    { value: 'e_cpf_a3', label: 'e-CPF A3' },
-                    { value: 'e_cnpj_a1', label: 'e-CNPJ A1' },
-                    { value: 'e_cnpj_a3', label: 'e-CNPJ A3' },
-                    { value: 'sites', label: 'Sites' },
-                    { value: 'crm', label: 'CRM' },
-                    { value: 'assinatura_digital', label: 'Assinatura Digital' },
-                    { value: 'emissor_nf', label: 'Emissor NF' },
-                    { value: 'gestao_instagram', label: 'Gestão Instagram' },
-                    { value: 'gestao_linkedin', label: 'Gestão LinkedIn' },
-                    { value: 'outro', label: 'Outro' },
-                  ].map(product => (
-                    <label 
-                      key={product.value}
-                      className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
-                        formData.products?.includes(product.value)
-                          ? 'bg-[#6B2D8B]/10 border border-[#6B2D8B]/20' 
-                          : 'bg-white hover:bg-slate-100 border border-slate-200'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={formData.products?.includes(product.value)}
-                        onChange={(e) => {
-                          const newProducts = e.target.checked
-                            ? [...(formData.products || []), product.value]
-                            : (formData.products || []).filter(p => p !== product.value);
-                          handleChange('products', newProducts);
-                        }}
-                        className="w-4 h-4 text-[#6B2D8B] rounded"
-                      />
-                      <span className="text-sm">{product.label}</span>
-                    </label>
-                  ))}
-                </div>
-                {formData.products?.length > 0 && (
-                  <p className="text-xs text-[#6B2D8B] font-medium">
-                    {formData.products.length} produto(s) selecionado(s)
-                  </p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="dt_fim">Data de Fim/Vencimento</Label>
-                  <Input
-                    id="dt_fim"
-                    type="date"
-                    value={formData.dt_fim}
-                    onChange={(e) => handleChange('dt_fim', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="validade">Data de Validade</Label>
-                  <Input
-                    id="validade"
-                    type="date"
-                    value={formData.validade}
-                    onChange={(e) => handleChange('validade', e.target.value)}
-                  />
-                </div>
-              </div>
-              </CardContent>
-              </Card>
-
-              {/* Actions */}
+          {/* Actions */}
           <div className="flex justify-end gap-4">
             <Button 
               type="button" 
