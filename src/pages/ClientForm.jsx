@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { ArrowLeft, Save, User, Building2, Phone, Mail, MapPin } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,8 +21,6 @@ export default function ClientForm() {
   const navigate = useNavigate();
   const urlParams = new URLSearchParams(window.location.search);
   const clientId = urlParams.get('id');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     client_name: '',
@@ -37,46 +36,56 @@ export default function ClientForm() {
     notes: '',
   });
 
-  useEffect(() => {
-    if (clientId) {
-      loadClient();
-    }
-  }, [clientId]);
+  // Buscar cliente se estiver editando
+  const { data: client, isLoading } = useQuery({
+    queryKey: ['client-edit', clientId],
+    queryFn: async () => {
+      if (!clientId) return null;
+      const allClients = await base44.entities.Client.list();
+      return allClients.find(c => c.id === clientId) || null;
+    },
+    enabled: !!clientId,
+  });
 
-  const loadClient = async () => {
-    setIsLoading(true);
-    try {
-      const clients = await base44.entities.Client.filter({ id: clientId });
-      if (clients.length > 0) {
-        setFormData(clients[0]);
-      }
-    } catch (error) {
-      console.error('Error loading client:', error);
-    } finally {
-      setIsLoading(false);
+  // Preencher formulário quando o cliente for carregado
+  useEffect(() => {
+    if (client) {
+      setFormData({
+        client_name: client.client_name || '',
+        company_name: client.company_name || '',
+        cpf: client.cpf || '',
+        cnpj: client.cnpj || '',
+        phone: client.phone || '',
+        whatsapp: client.whatsapp || '',
+        email: client.email || '',
+        business_area: client.business_area || '',
+        lead_status: client.lead_status || 'novo',
+        lead_source: client.lead_source || '',
+        notes: client.notes || '',
+      });
     }
-  };
+  }, [client]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (data) => {
+      if (clientId) {
+        return base44.entities.Client.update(clientId, data);
+      } else {
+        return base44.entities.Client.create(data);
+      }
+    },
+    onSuccess: () => {
+      navigate(createPageUrl('Clients'));
+    },
+  });
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setIsSaving(true);
-    
-    try {
-      if (clientId) {
-        await base44.entities.Client.update(clientId, formData);
-      } else {
-        await base44.entities.Client.create(formData);
-      }
-      navigate(createPageUrl('Clients'));
-    } catch (error) {
-      console.error('Error saving client:', error);
-    } finally {
-      setIsSaving(false);
-    }
+    saveMutation.mutate(formData);
   };
 
   if (isLoading) {
@@ -94,7 +103,7 @@ export default function ClientForm() {
         <Button 
           variant="ghost" 
           size="icon"
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(createPageUrl('Clients'))}
           className="rounded-xl"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -264,6 +273,7 @@ export default function ClientForm() {
                     <SelectItem value="google_ads">Google Ads</SelectItem>
                     <SelectItem value="linkedin">LinkedIn</SelectItem>
                     <SelectItem value="organico">Orgânico</SelectItem>
+                    <SelectItem value="renovacao">Renovação</SelectItem>
                     <SelectItem value="outro">Outro</SelectItem>
                   </SelectContent>
                 </Select>
@@ -286,16 +296,16 @@ export default function ClientForm() {
             <Button 
               type="button" 
               variant="outline"
-              onClick={() => navigate(-1)}
+              onClick={() => navigate(createPageUrl('Clients'))}
             >
               Cancelar
             </Button>
             <Button 
               type="submit" 
-              disabled={isSaving}
+              disabled={saveMutation.isPending}
               className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]"
             >
-              {isSaving ? (
+              {saveMutation.isPending ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
                   Salvando...

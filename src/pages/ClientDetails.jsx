@@ -4,7 +4,6 @@ import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { 
   ArrowLeft, Edit, Phone, Mail, Building2, Calendar,
   MessageSquare, CheckCircle, Clock, AlertTriangle,
@@ -13,7 +12,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import InteractionForm from '@/components/crm/InteractionForm';
 import WhatsAppAIAssistant from '@/components/whatsapp/WhatsAppAIAssistant';
 import EmailAIAssistant from '@/components/email/EmailAIAssistant';
@@ -25,52 +23,50 @@ export default function ClientDetails() {
   const urlParams = new URLSearchParams(window.location.search);
   const clientId = urlParams.get('id');
   const [showInteractionForm, setShowInteractionForm] = useState(false);
-  const [user, setUser] = useState(null);
   const { getDisplayName } = useUserDisplayName();
 
-  useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const userData = await base44.auth.me();
-        setUser(userData);
-      } catch (e) {}
-    };
-    loadUser();
-  }, []);
-
-  const { data: client, isLoading, error } = useQuery({
-    queryKey: ['client-details', clientId],
-    queryFn: async () => {
-      const allClients = await base44.entities.Client.list();
-      const found = allClients.find(c => c.id === clientId);
-      return found || null;
-    },
-    enabled: !!clientId && !!user,
-    staleTime: Infinity,
-    gcTime: Infinity,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    retry: false,
+  // Buscar usuário
+  const { data: user } = useQuery({
+    queryKey: ['current-user'],
+    queryFn: () => base44.auth.me(),
+    staleTime: 5 * 60 * 1000,
   });
 
+  // Buscar cliente específico
+  const { data: client, isLoading: clientLoading } = useQuery({
+    queryKey: ['client', clientId],
+    queryFn: async () => {
+      if (!clientId) return null;
+      const allClients = await base44.entities.Client.list();
+      return allClients.find(c => c.id === clientId) || null;
+    },
+    enabled: !!clientId,
+    staleTime: 30000,
+  });
+
+  // Buscar interações
   const { data: interactions = [] } = useQuery({
     queryKey: ['interactions', clientId],
-    queryFn: () => base44.entities.Interaction.filter({ client_id: clientId }, '-created_date'),
+    queryFn: async () => {
+      if (!clientId) return [];
+      const allInteractions = await base44.entities.Interaction.list('-created_date');
+      return allInteractions.filter(i => i.client_id === clientId);
+    },
     enabled: !!clientId && !!client,
-    staleTime: 60000,
-    refetchOnWindowFocus: false,
+    staleTime: 30000,
   });
 
+  // Buscar agendamentos
   const { data: appointments = [] } = useQuery({
     queryKey: ['appointments', clientId],
-    queryFn: () => base44.entities.Appointment.filter({ client_id: clientId }, '-date'),
+    queryFn: async () => {
+      if (!clientId) return [];
+      const allAppointments = await base44.entities.Appointment.list('-date');
+      return allAppointments.filter(a => a.client_id === clientId);
+    },
     enabled: !!clientId && !!client,
-    staleTime: 60000,
-    refetchOnWindowFocus: false,
+    staleTime: 30000,
   });
-
-
 
   const createInteractionMutation = useMutation({
     mutationFn: (data) => base44.entities.Interaction.create({
@@ -87,7 +83,7 @@ export default function ClientDetails() {
     },
   });
 
-  if (isLoading || !user) {
+  if (clientLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin w-8 h-8 border-4 border-[#6B2D8B] border-t-transparent rounded-full" />
@@ -95,7 +91,7 @@ export default function ClientDetails() {
     );
   }
 
-  if (!isLoading && !client) {
+  if (!client) {
     return (
       <div className="text-center py-16">
         <User className="w-16 h-16 mx-auto mb-4 text-slate-300" />
@@ -137,7 +133,7 @@ export default function ClientDetails() {
           <Button 
             variant="ghost" 
             size="icon"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(createPageUrl('Clients'))}
             className="rounded-xl"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -178,19 +174,19 @@ export default function ClientDetails() {
         <div className="lg:col-span-2 space-y-6">
           {showInteractionForm && (
             <Card className="border-0 shadow-lg border-l-4 border-l-[#6B2D8B]">
-                <CardHeader>
-                  <CardTitle className="text-lg">Registrar Interação</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <InteractionForm
-                    onSubmit={(data) => createInteractionMutation.mutate(data)}
-                    onCancel={() => setShowInteractionForm(false)}
-                    isLoading={createInteractionMutation.isPending}
-                    clientId={clientId}
-                    clientName={client?.client_name}
-                  />
-                </CardContent>
-              </Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Registrar Interação</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <InteractionForm
+                  onSubmit={(data) => createInteractionMutation.mutate(data)}
+                  onCancel={() => setShowInteractionForm(false)}
+                  isLoading={createInteractionMutation.isPending}
+                  clientId={clientId}
+                  clientName={client?.client_name}
+                />
+              </CardContent>
+            </Card>
           )}
 
           <Card className="border-0 shadow-lg">
@@ -326,52 +322,50 @@ export default function ClientDetails() {
                   <p className="text-slate-600 text-sm">{client.notes}</p>
                 </div>
               )}
-              </CardContent>
-              </Card>
+            </CardContent>
+          </Card>
 
-              {/* WhatsApp AI Assistant */}
-              <WhatsAppAIAssistant
-                client={client}
-                interactions={interactions}
-                campaign={null}
-                onSelectMessage={(message) => {
-                  // Abrir WhatsApp com a mensagem
-                  const phone = client.whatsapp || client.phone;
-                  if (phone) {
-                    const cleanPhone = phone.replace(/\D/g, '');
-                    window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
-                  }
-                }}
-              />
+          {/* WhatsApp AI Assistant */}
+          <WhatsAppAIAssistant
+            client={client}
+            interactions={interactions}
+            campaign={null}
+            onSelectMessage={(message) => {
+              const phone = client.whatsapp || client.phone;
+              if (phone) {
+                const cleanPhone = phone.replace(/\D/g, '');
+                window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+              }
+            }}
+          />
 
-              {/* Email AI Assistant */}
-              <EmailAIAssistant
-                client={client}
-                interactions={interactions}
-                campaign={null}
-                onSendEmail={async ({ to, subject, body }) => {
-                  try {
-                    await base44.integrations.Core.SendEmail({
-                      to,
-                      subject,
-                      body
-                    });
-                    // Registrar interação de email
-                    await base44.entities.Interaction.create({
-                      client_id: client.id,
-                      client_name: client.client_name,
-                      interaction_type: 'tentativa_email',
-                      contact_method: 'email',
-                      notes: `Assunto: ${subject}`,
-                      agent_name: user?.full_name,
-                      agent_email: user?.email,
-                    });
-                    queryClient.invalidateQueries(['interactions', clientId]);
-                  } catch (error) {
-                    console.error('Erro ao enviar email:', error);
-                  }
-                }}
-              />
+          {/* Email AI Assistant */}
+          <EmailAIAssistant
+            client={client}
+            interactions={interactions}
+            campaign={null}
+            onSendEmail={async ({ to, subject, body }) => {
+              try {
+                await base44.integrations.Core.SendEmail({
+                  to,
+                  subject,
+                  body
+                });
+                await base44.entities.Interaction.create({
+                  client_id: client.id,
+                  client_name: client.client_name,
+                  interaction_type: 'tentativa_email',
+                  contact_method: 'email',
+                  notes: `Assunto: ${subject}`,
+                  agent_name: user?.full_name,
+                  agent_email: user?.email,
+                });
+                queryClient.invalidateQueries(['interactions', clientId]);
+              } catch (error) {
+                console.error('Erro ao enviar email:', error);
+              }
+            }}
+          />
 
           {/* Appointments */}
           <Card className="border-0 shadow-lg">

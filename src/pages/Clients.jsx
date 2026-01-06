@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { 
   Search, Plus, User, Building2, Phone, Mail, 
   Filter, MoreVertical, Eye, Edit, Trash2 
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -35,27 +35,31 @@ import {
 } from "@/components/ui/table";
 
 export default function Clients() {
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
-  const [user, setUser] = useState(null);
 
-  useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const userData = await base44.auth.me();
-        setUser(userData);
-      } catch (e) {}
-    };
-    loadUser();
-  }, []);
+  const { data: user } = useQuery({
+    queryKey: ['current-user'],
+    queryFn: () => base44.auth.me(),
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const isAdmin = user?.role === 'admin';
-
-  const { data: clients = [], refetch } = useQuery({
+  const { data: clients = [], isLoading } = useQuery({
     queryKey: ['clients'],
     queryFn: () => base44.entities.Client.list('-created_date'),
+    staleTime: 10000,
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.Client.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['clients']);
+    },
+  });
+
+  const isAdmin = user?.role === 'admin';
 
   const filteredClients = clients.filter(client => {
     const matchesSearch = !searchTerm || 
@@ -86,10 +90,17 @@ export default function Clients() {
       return;
     }
     if (window.confirm('Tem certeza que deseja excluir este cliente?')) {
-      await base44.entities.Client.delete(id);
-      refetch();
+      deleteMutation.mutate(id);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin w-8 h-8 border-4 border-[#6B2D8B] border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -147,6 +158,7 @@ export default function Clients() {
                 <SelectItem value="google_ads">Google Ads</SelectItem>
                 <SelectItem value="linkedin">LinkedIn</SelectItem>
                 <SelectItem value="organico">Orgânico</SelectItem>
+                <SelectItem value="renovacao">Renovação</SelectItem>
                 <SelectItem value="outro">Outro</SelectItem>
               </SelectContent>
             </Select>
