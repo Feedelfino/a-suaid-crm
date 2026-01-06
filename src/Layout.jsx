@@ -89,8 +89,13 @@ export default function Layout({ children, currentPageName }) {
     checkAccess();
   }, []);
 
-  const handleLogout = () => {
-    base44.auth.logout();
+  const handleLogout = async () => {
+    try {
+      await base44.auth.logout(window.location.origin);
+    } catch (error) {
+      console.error('Erro ao deslogar:', error);
+      window.location.href = '/';
+    }
   };
 
   // Loading state
