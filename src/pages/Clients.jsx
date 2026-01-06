@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { 
   Search, Plus, User, Building2, Phone, Mail, 
-  Filter, MoreVertical, Eye, Edit, Trash2 
+  Filter, MoreVertical, Eye, Edit, Trash2, AlertTriangle, Download, Users
 } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,7 +59,84 @@ export default function Clients() {
     },
   });
 
+  const migrateMutation = useMutation({
+    mutationFn: () => base44.functions.invoke('migrateCertificatesToClients'),
+    onSuccess: (response) => {
+      alert(response.data.message);
+      queryClient.invalidateQueries(['clients']);
+    },
+  });
+
   const isAdmin = user?.role === 'admin';
+
+  // Detectar duplicados por CPF, CNPJ, Email e Telefone
+  const duplicates = React.useMemo(() => {
+    const cpfMap = {};
+    const cnpjMap = {};
+    const emailMap = {};
+    const phoneMap = {};
+    const duplicatedIds = new Set();
+
+    clients.forEach(client => {
+      const cpf = client.cpf?.replace(/\D/g, '');
+      const cnpj = client.cnpj?.replace(/\D/g, '');
+      const email = client.email?.toLowerCase().trim();
+      const phone = client.phone?.replace(/\D/g, '');
+
+      if (cpf && cpf.length === 11) {
+        if (cpfMap[cpf]) {
+          duplicatedIds.add(client.id);
+          duplicatedIds.add(cpfMap[cpf]);
+        } else {
+          cpfMap[cpf] = client.id;
+        }
+      }
+
+      if (cnpj && cnpj.length === 14) {
+        if (cnpjMap[cnpj]) {
+          duplicatedIds.add(client.id);
+          duplicatedIds.add(cnpjMap[cnpj]);
+        } else {
+          cnpjMap[cnpj] = client.id;
+        }
+      }
+
+      if (email && email.includes('@')) {
+        if (emailMap[email]) {
+          duplicatedIds.add(client.id);
+          duplicatedIds.add(emailMap[email]);
+        } else {
+          emailMap[email] = client.id;
+        }
+      }
+
+      if (phone && phone.length >= 10) {
+        if (phoneMap[phone]) {
+          duplicatedIds.add(client.id);
+          duplicatedIds.add(phoneMap[phone]);
+        } else {
+          phoneMap[phone] = client.id;
+        }
+      }
+    });
+
+    return {
+      ids: duplicatedIds,
+      count: duplicatedIds.size,
+      clients: clients.filter(c => duplicatedIds.has(c.id))
+    };
+  }, [clients]);
+
+  // Estatísticas de contatos
+  const contactStats = React.useMemo(() => {
+    return {
+      total: clients.length,
+      withPhone: clients.filter(c => c.phone).length,
+      withEmail: clients.filter(c => c.email).length,
+      withWhatsApp: clients.filter(c => c.whatsapp).length,
+      duplicates: duplicates.count,
+    };
+  }, [clients, duplicates]);
 
   const filteredClients = clients.filter(client => {
     const matchesSearch = !searchTerm || 
@@ -110,13 +187,107 @@ export default function Clients() {
           <h1 className="text-2xl font-bold text-slate-800">Cadastros</h1>
           <p className="text-slate-500">Gerencie todos os seus clientes</p>
         </div>
-        <Link to={createPageUrl('ClientForm')}>
-          <Button className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]">
-            <Plus className="w-4 h-4 mr-2" />
-            Novo Cliente
-          </Button>
-        </Link>
+        <div className="flex gap-3">
+          {isAdmin && (
+            <Button 
+              variant="outline" 
+              onClick={() => migrateMutation.mutate()}
+              disabled={migrateMutation.isPending}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              {migrateMutation.isPending ? 'Migrando...' : 'Migrar Renovações'}
+            </Button>
+          )}
+          <Link to={createPageUrl('ClientForm')}>
+            <Button className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]">
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Cliente
+            </Button>
+          </Link>
+        </div>
       </div>
+
+      {/* Estatísticas */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Users className="w-5 h-5 text-[#6B2D8B]" />
+              <div>
+                <p className="text-xs text-slate-500">Total</p>
+                <p className="text-xl font-bold text-slate-800">{contactStats.total}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Phone className="w-5 h-5 text-green-600" />
+              <div>
+                <p className="text-xs text-slate-500">Com Telefone</p>
+                <p className="text-xl font-bold text-slate-800">{contactStats.withPhone}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Mail className="w-5 h-5 text-blue-600" />
+              <div>
+                <p className="text-xs text-slate-500">Com E-mail</p>
+                <p className="text-xl font-bold text-slate-800">{contactStats.withEmail}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Building2 className="w-5 h-5 text-green-600" />
+              <div>
+                <p className="text-xs text-slate-500">WhatsApp</p>
+                <p className="text-xl font-bold text-slate-800">{contactStats.withWhatsApp}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className={`border-0 shadow-md ${duplicates.count > 0 ? 'bg-amber-50 border-l-4 border-l-amber-500' : ''}`}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className={`w-5 h-5 ${duplicates.count > 0 ? 'text-amber-600' : 'text-slate-400'}`} />
+              <div>
+                <p className="text-xs text-slate-500">Duplicados</p>
+                <p className="text-xl font-bold text-slate-800">{duplicates.count}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Alerta de Duplicados */}
+      {duplicates.count > 0 && (
+        <Card className="border-0 shadow-lg bg-amber-50 border-l-4 border-l-amber-500">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-semibold text-amber-900">
+                  {duplicates.count} cadastros duplicados detectados
+                </p>
+                <p className="text-sm text-amber-800 mt-1">
+                  Clientes com mesmo CPF, CNPJ, e-mail ou telefone. Recomenda-se revisar e consolidar os registros.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card className="border-0 shadow-lg">
@@ -182,11 +353,19 @@ export default function Clients() {
             </TableHeader>
             <TableBody>
               {filteredClients.map((client) => (
-                <TableRow key={client.id} className="hover:bg-slate-50">
+                <TableRow 
+                  key={client.id} 
+                  className={`hover:bg-slate-50 ${duplicates.ids.has(client.id) ? 'bg-amber-50' : ''}`}
+                >
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#6B2D8B] to-[#8B4DAB] flex items-center justify-center text-white font-bold text-sm">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#6B2D8B] to-[#8B4DAB] flex items-center justify-center text-white font-bold text-sm relative">
                         {client.client_name?.charAt(0) || 'C'}
+                        {duplicates.ids.has(client.id) && (
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center">
+                            <AlertTriangle className="w-3 h-3 text-white" />
+                          </div>
+                        )}
                       </div>
                       <div>
                         <p className="font-medium text-slate-800">{client.client_name}</p>
