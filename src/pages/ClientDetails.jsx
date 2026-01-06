@@ -41,7 +41,11 @@ export default function ClientDetails() {
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ['client', clientId],
     queryFn: () => base44.entities.Client.filter({ id: clientId }),
-    enabled: !!clientId,
+    enabled: !!clientId && !!user,
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const client = clients[0];
@@ -49,13 +53,17 @@ export default function ClientDetails() {
   const { data: interactions = [] } = useQuery({
     queryKey: ['interactions', clientId],
     queryFn: () => base44.entities.Interaction.filter({ client_id: clientId }, '-created_date'),
-    enabled: !!clientId,
+    enabled: !!clientId && !!client,
+    staleTime: 60000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: appointments = [] } = useQuery({
     queryKey: ['appointments', clientId],
     queryFn: () => base44.entities.Appointment.filter({ client_id: clientId }, '-date'),
-    enabled: !!clientId,
+    enabled: !!clientId && !!client,
+    staleTime: 60000,
+    refetchOnWindowFocus: false,
   });
 
 
