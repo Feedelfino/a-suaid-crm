@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { ArrowLeft, Save, User, Building2, Phone, Mail, MapPin } from 'lucide-react';
+import { ArrowLeft, Save, User, Building2, Phone, Mail, MapPin, FileText, RefreshCw } from 'lucide-react';
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,13 @@ export default function ClientForm() {
     lead_status: 'novo',
     lead_source: '',
     notes: '',
+    has_certificate: false,
+    certificate_type: '',
+    certificate_expiry_date: '',
+    has_service: false,
+    service_type: '',
+    service_expiry_date: '',
+    renewal_status: '',
   });
 
   // Buscar cliente se estiver editando
@@ -62,6 +70,13 @@ export default function ClientForm() {
         lead_status: client.lead_status || 'novo',
         lead_source: client.lead_source || '',
         notes: client.notes || '',
+        has_certificate: client.has_certificate || false,
+        certificate_type: client.certificate_type || '',
+        certificate_expiry_date: client.certificate_expiry_date || '',
+        has_service: client.has_service || false,
+        service_type: client.service_type || '',
+        service_expiry_date: client.service_expiry_date || '',
+        renewal_status: client.renewal_status || '',
       });
     }
   }, [client]);
@@ -288,6 +303,131 @@ export default function ClientForm() {
                   rows={4}
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Renovação - Certificado */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileText className="w-5 h-5 text-[#6B2D8B]" />
+                Certificado Digital
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                <div>
+                  <Label htmlFor="has_certificate" className="text-base font-medium">
+                    Cliente possui certificado digital?
+                  </Label>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Ative se o cliente tiver certificado A1 ou A3
+                  </p>
+                </div>
+                <Switch
+                  id="has_certificate"
+                  checked={formData.has_certificate}
+                  onCheckedChange={(checked) => handleChange('has_certificate', checked)}
+                />
+              </div>
+
+              {formData.has_certificate && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div className="space-y-2">
+                    <Label>Tipo de Certificado</Label>
+                    <Select 
+                      value={formData.certificate_type || ''} 
+                      onValueChange={(v) => handleChange('certificate_type', v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o tipo..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="e_cpf_a1">e-CPF A1</SelectItem>
+                        <SelectItem value="e_cpf_a3">e-CPF A3</SelectItem>
+                        <SelectItem value="e_cnpj_a1">e-CNPJ A1</SelectItem>
+                        <SelectItem value="e_cnpj_a3">e-CNPJ A3</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="certificate_expiry_date">Data de Validade</Label>
+                    <Input
+                      id="certificate_expiry_date"
+                      type="date"
+                      value={formData.certificate_expiry_date}
+                      onChange={(e) => handleChange('certificate_expiry_date', e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Renovação - Serviço */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-[#6B2D8B]" />
+                Serviços Contratados
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                <div>
+                  <Label htmlFor="has_service" className="text-base font-medium">
+                    Cliente possui serviço ativo?
+                  </Label>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Ative se o cliente tiver algum serviço recorrente
+                  </p>
+                </div>
+                <Switch
+                  id="has_service"
+                  checked={formData.has_service}
+                  onCheckedChange={(checked) => handleChange('has_service', checked)}
+                />
+              </div>
+
+              {formData.has_service && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="service_type">Tipo de Serviço</Label>
+                    <Input
+                      id="service_type"
+                      value={formData.service_type}
+                      onChange={(e) => handleChange('service_type', e.target.value)}
+                      placeholder="Ex: Site, CRM, Marketing..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="service_expiry_date">Data de Vencimento</Label>
+                    <Input
+                      id="service_expiry_date"
+                      type="date"
+                      value={formData.service_expiry_date}
+                      onChange={(e) => handleChange('service_expiry_date', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Status de Renovação</Label>
+                    <Select 
+                      value={formData.renewal_status || ''} 
+                      onValueChange={(v) => handleChange('renewal_status', v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o status..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ativo">Ativo</SelectItem>
+                        <SelectItem value="vencido">Vencido</SelectItem>
+                        <SelectItem value="proximo_vencimento">Próximo do Vencimento</SelectItem>
+                        <SelectItem value="renovado">Renovado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

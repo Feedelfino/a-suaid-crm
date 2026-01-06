@@ -7,7 +7,7 @@ import { format, parseISO } from 'date-fns';
 import { 
   ArrowLeft, Edit, Phone, Mail, Building2, Calendar,
   MessageSquare, CheckCircle, Clock, AlertTriangle,
-  Video, MapPin, DollarSign, Plus, User
+  Video, MapPin, DollarSign, Plus, User, FileText, RefreshCw
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -324,6 +324,75 @@ export default function ClientDetails() {
               )}
             </CardContent>
           </Card>
+
+          {/* Certificado Digital */}
+          {client.has_certificate && (
+            <Card className="border-0 shadow-lg border-l-4 border-l-[#C71585]">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-[#C71585]" />
+                  Certificado Digital
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {client.certificate_type && (
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Tipo</p>
+                    <p className="font-medium text-slate-800">{client.certificate_type.replace('_', '-').toUpperCase()}</p>
+                  </div>
+                )}
+                {client.certificate_expiry_date && (
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Validade</p>
+                    <p className="font-medium text-slate-800">
+                      {format(parseISO(client.certificate_expiry_date), 'dd/MM/yyyy')}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Serviço Contratado */}
+          {client.has_service && (
+            <Card className="border-0 shadow-lg border-l-4 border-l-green-500">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <RefreshCw className="w-5 h-5 text-green-600" />
+                  Serviço Ativo
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {client.service_type && (
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Serviço</p>
+                    <p className="font-medium text-slate-800">{client.service_type}</p>
+                  </div>
+                )}
+                {client.service_expiry_date && (
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Vencimento</p>
+                    <p className="font-medium text-slate-800">
+                      {format(parseISO(client.service_expiry_date), 'dd/MM/yyyy')}
+                    </p>
+                  </div>
+                )}
+                {client.renewal_status && (
+                  <div>
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Status</p>
+                    <Badge className={
+                      client.renewal_status === 'ativo' ? 'bg-green-100 text-green-700' :
+                      client.renewal_status === 'vencido' ? 'bg-red-100 text-red-700' :
+                      client.renewal_status === 'proximo_vencimento' ? 'bg-amber-100 text-amber-700' :
+                      'bg-blue-100 text-blue-700'
+                    }>
+                      {client.renewal_status.replace('_', ' ')}
+                    </Badge>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* WhatsApp AI Assistant */}
           <WhatsAppAIAssistant
