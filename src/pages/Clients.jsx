@@ -6,10 +6,13 @@ import { useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { 
   Search, Plus, User, Building2, Phone, Mail, 
-  Filter, MoreVertical, Eye, Edit, Trash2, FileSpreadsheet, Upload
+  Filter, MoreVertical, Eye, Edit, Trash2, FileSpreadsheet, Upload, Users
 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ImportFromSheetsDialog from '@/components/data/ImportFromSheetsDialog';
 import DuplicateDetector from '@/components/data/DuplicateDetector';
+import RenewalClientsView from '@/components/clients/RenewalClientsView';
+import DuplicatesMonitorView from '@/components/clients/DuplicatesMonitorView';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -140,7 +143,32 @@ export default function Clients() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Total Count Card */}
+      <Card className="border-0 shadow-lg bg-gradient-to-r from-[#6B2D8B] to-[#8B4DAB] text-white">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white/80 text-sm font-medium">Total de Clientes Cadastrados</p>
+              <p className="text-4xl font-bold mt-1">{clients.length}</p>
+            </div>
+            <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center">
+              <Users className="w-8 h-8 text-white" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tabs */}
+      <Tabs defaultValue="all" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
+          <TabsTrigger value="all">Todos os Clientes</TabsTrigger>
+          <TabsTrigger value="renewal">Renovações</TabsTrigger>
+          <TabsTrigger value="duplicates">Monitor de Duplicados</TabsTrigger>
+        </TabsList>
+
+        {/* Tab: Todos os Clientes */}
+        <TabsContent value="all" className="space-y-6">
+          {/* Filters */}
       <Card className="border-0 shadow-lg">
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row gap-4">
@@ -297,6 +325,18 @@ export default function Clients() {
           </div>
         )}
       </Card>
+        </TabsContent>
+
+        {/* Tab: Renovações */}
+        <TabsContent value="renewal">
+          <RenewalClientsView clients={clients} />
+        </TabsContent>
+
+        {/* Tab: Monitor de Duplicados */}
+        <TabsContent value="duplicates">
+          <DuplicatesMonitorView clients={clients} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
