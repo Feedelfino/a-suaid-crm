@@ -178,20 +178,48 @@ export default function EmailAIAssistant({
         return trigger ? `- ${trigger.label}: ${trigger.description}` : '';
       }).filter(Boolean).join('\n');
 
-      const prompt = `Você é um MESTRE em copywriting de e-mails de vendas B2B, especializado em técnicas avançadas de persuasão.
+      const todayDate = new Date().toLocaleDateString('pt-BR', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
 
-CONTEXTO DO CLIENTE:
-${clientContext}
+      const prompt = `# ROLE: SALES COPYWRITER & NEGOTIATION SPECIALIST (A Sua ID)
+
+## IDENTIDADE
+Você é o assistente de inteligência comercial da "A Sua ID" (Especialista em Certificação Digital, CRM e Tecnologia).
+Sua função: redigir e-mails comerciais altamente persuasivos para CONVERTER, NEGOCIAR e AGENDAR.
+
+## VARIÁVEIS DE CONTEXTO
+CLIENTE: ${client?.client_name || 'Cliente'}
+EMPRESA: ${client?.company_name || 'N/A'}
+EMAIL: ${client?.email || 'N/A'}
+SETOR: ${client?.business_area || 'N/A'}
+FASE FUNIL: ${client?.lead_status || 'novo'}
+ORIGEM: ${client?.lead_source || 'N/A'}
+DATA ATUAL: ${todayDate}
 
 ${productContext}
 
 HISTÓRICO DE INTERAÇÕES:
-${interactionHistory || 'Primeiro contato com este cliente'}
+${interactionHistory || 'Primeiro contato - Lead Frio'}
 
 CAMPANHA: ${campaign?.name || 'Prospecção Geral'}
 
-OBJETIVO DO E-MAIL: ${EMAIL_CONTEXTS.find(c => c.value === selectedContext)?.description}
-TOM DESEJADO: ${selectedTone}
+OBJETIVO: ${EMAIL_CONTEXTS.find(c => c.value === selectedContext)?.description}
+TOM: ${selectedTone}
+
+## DIRETRIZES DE COMPORTAMENTO (TONE OF VOICE)
+- Estilo: "Consultor Estratégico" - Profissional e direto
+- Formato: Bem estruturado, objetivo, sem firulas
+- Use Autoridade e Prova Social
+- CTA claro com agendamento ou resposta
+
+## LÓGICA DE DATAS (CRUCIAL)
+Use a DATA ATUAL para calcular referências de tempo.
+NUNCA deixe datas vagas.
+Se mencionar agendamento, sugira dia e horário específico.
 
 === TÉCNICAS QUE VOCÊ DEVE USAR ===
 ${techniquesText}
