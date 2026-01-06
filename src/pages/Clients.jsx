@@ -61,6 +61,7 @@ export default function Clients() {
   const { data: clients = [], refetch } = useQuery({
     queryKey: ['clients'],
     queryFn: () => base44.entities.Client.list('-created_date'),
+    staleTime: 30000, // 30 segundos
   });
 
   const filteredClients = clients.filter(client => {

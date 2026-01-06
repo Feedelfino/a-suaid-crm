@@ -23,7 +23,10 @@ import {
 
 export default function RenewalClientsView({ clients }) {
   // Filtrar apenas clientes com dt_fim ou validade preenchidos
-  const renewalClients = clients.filter(c => c.dt_fim || c.validade);
+  const renewalClients = React.useMemo(() => 
+    clients.filter(c => c.dt_fim || c.validade), 
+    [clients]
+  );
 
   const getExpiryStatus = (client) => {
     const expiryDate = client.dt_fim || client.validade;

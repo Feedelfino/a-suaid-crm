@@ -42,7 +42,10 @@ export default function RenewalsDashboard() {
 
   const { data: clients = [] } = useQuery({
     queryKey: ['clients-renovation'],
-    queryFn: () => base44.entities.Client.filter({ lead_source: 'renovacao' }),
+    queryFn: async () => {
+      const allClients = await base44.entities.Client.list('-created_date');
+      return allClients.filter(c => c.dt_fim || c.validade);
+    },
   });
 
   const today = new Date();

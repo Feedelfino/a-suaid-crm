@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Save, User, Building2, Phone, Mail, MapPin } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import {
 
 export default function ClientForm() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const urlParams = new URLSearchParams(window.location.search);
   const clientId = urlParams.get('id');
   const [isLoading, setIsLoading] = useState(false);
@@ -71,6 +73,11 @@ export default function ClientForm() {
     try {
       if (clientId) {
         await base44.entities.Client.update(clientId, formData);
+        // Invalidar queries para atualizar todas as views
+        queryClient.invalidateQueries(['clients']);
+        queryClient.invalidateQueries(['clients-renovation']);
+        queryClient.invalidateQueries(['certificates-dashboard']);
+        queryClient.invalidateQueries(['client', clientId]);
       } else {
         const newClient = await base44.entities.Client.create(formData);
         
@@ -82,6 +89,10 @@ export default function ClientForm() {
         } catch (err) {
           console.log('Auto-merge não executado:', err);
         }
+        
+        // Invalidar queries
+        queryClient.invalidateQueries(['clients']);
+        queryClient.invalidateQueries(['clients-renovation']);
       }
       navigate(createPageUrl('Clients'));
     } catch (error) {
