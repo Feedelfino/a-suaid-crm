@@ -38,9 +38,12 @@ export default function ClientDetails() {
     loadUser();
   }, []);
 
-  const { data: clients = [], isLoading } = useQuery({
+  const { data: client, isLoading } = useQuery({
     queryKey: ['client', clientId],
-    queryFn: () => base44.entities.Client.filter({ id: clientId }),
+    queryFn: async () => {
+      const clients = await base44.entities.Client.list();
+      return clients.find(c => c.id === clientId);
+    },
     enabled: !!clientId,
   });
 
@@ -56,7 +59,7 @@ export default function ClientDetails() {
     enabled: !!clientId,
   });
 
-  const client = clients[0];
+
 
   const createInteractionMutation = useMutation({
     mutationFn: (data) => base44.entities.Interaction.create({
