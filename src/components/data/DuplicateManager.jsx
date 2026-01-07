@@ -184,15 +184,24 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['clients']);
+      queryClient.invalidateQueries(['existing-clients-for-import']);
       setSelectedGroup(null);
       setPrimaryClientId(null);
+      setSelectedClientsInGroup([]);
+      alert('Cadastros unificados com sucesso!');
+    },
+    onError: (error) => {
+      console.error('Erro ao unificar:', error);
+      alert('Erro ao unificar cadastros: ' + error.message);
     },
   });
 
   const handleSelectGroup = (group) => {
     setSelectedGroup(group);
-    setPrimaryClientId(group.clients[0].id);
-    setSelectedClientsInGroup(group.clients.map(c => c.id));
+    // Filtrar apenas clientes não ignorados
+    const activeClients = group.clients.filter(c => !ignoredClients.has(c.id));
+    setPrimaryClientId(activeClients[0]?.id);
+    setSelectedClientsInGroup(activeClients.map(c => c.id));
   };
 
   const toggleClientSelection = (clientId) => {
@@ -214,10 +223,15 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
   };
 
   const handleMerge = () => {
-    if (!primaryClientId || !selectedGroup) return;
+    if (!primaryClientId || !selectedGroup) {
+      console.log('Faltam dados:', { primaryClientId, selectedGroup });
+      return;
+    }
 
     const duplicateIds = selectedClientsInGroup
-      .filter(id => id !== primaryClientId);
+      .filter(id => id !== primaryClientId && !ignoredClients.has(id));
+
+    console.log('Unificando:', { primaryClientId, duplicateIds, selectedClientsInGroup });
 
     if (duplicateIds.length === 0) {
       alert('Selecione pelo menos um cadastro duplicado para unificar.');
