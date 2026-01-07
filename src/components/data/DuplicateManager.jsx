@@ -286,7 +286,7 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
       <Dialog open={open && !selectedGroup} onOpenChange={(o) => !o && onOpenChange(false)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
+            <DialogTitle className="flex items-center justify-between pr-8">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-amber-600" />
                 Gerenciar Cadastros Duplicados
@@ -298,9 +298,8 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleRestoreIgnored} className="bg-background mx-16 px-3 text-xs font-medium rounded-none inline-flex items-center justify-center gap-2 whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground h-8">
-
-
+                onClick={handleRestoreIgnored}
+                className="text-xs">
                   Restaurar Ignorados ({ignoredGroups.size + ignoredClients.size})
                 </Button>
               }
