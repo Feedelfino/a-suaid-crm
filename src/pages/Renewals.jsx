@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { 
   RefreshCw, AlertCircle, Clock, TrendingUp, Search, Filter, Eye, Phone, Mail,
-  CheckCircle2, XCircle, Users, Calendar, ChevronDown, ChevronUp
+  CheckCircle2, XCircle, Users, Calendar, ChevronDown, ChevronUp, Trash2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -265,6 +265,14 @@ export default function Renewals() {
     },
   });
 
+  // Mutation para deletar certificado
+  const deleteCertificateMutation = useMutation({
+    mutationFn: (certId) => base44.entities.Certificate.delete(certId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['certificates']);
+    },
+  });
+
   // Handlers
   const toggleDateFilter = (filter) => {
     setDateFilters(prev => 
@@ -300,6 +308,12 @@ export default function Renewals() {
       nao_renovado: 'bg-red-100 text-red-700',
     };
     return colors[status] || 'bg-slate-100 text-slate-700';
+  };
+
+  const handleDeleteCertificate = (certId, clientName) => {
+    if (confirm(`Confirma a exclusão do certificado de ${clientName}? Esta ação não pode ser desfeita.`)) {
+      deleteCertificateMutation.mutate(certId);
+    }
   };
 
   if (isLoading) {
@@ -562,7 +576,7 @@ export default function Renewals() {
                   </TableHead>
                   <TableHead className="font-semibold">Status</TableHead>
                   <TableHead className="font-semibold">Responsável</TableHead>
-                  <TableHead className="w-12"></TableHead>
+                  <TableHead className="w-24"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -647,11 +661,21 @@ export default function Renewals() {
                         <span className="text-sm text-slate-600">{renewal.assigned_agent || '-'}</span>
                       </TableCell>
                       <TableCell>
-                        <Link to={createPageUrl(`ClientDetails?id=${renewal.client_id}`)}>
-                          <Button variant="ghost" size="icon">
-                            <Eye className="w-4 h-4" />
+                        <div className="flex items-center gap-1">
+                          <Link to={createPageUrl(`ClientDetails?id=${renewal.client_id}`)}>
+                            <Button variant="ghost" size="icon">
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </Link>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleDeleteCertificate(renewal.id, renewal.client_name)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </Button>
-                        </Link>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
