@@ -21,6 +21,7 @@ import Tasks from './pages/Tasks';
 import Clients from './pages/Clients';
 import Renewals from './pages/Renewals';
 import RenewalsDashboard from './pages/RenewalsDashboard';
+import RenewalsUnified from './pages/RenewalsUnified';
 import __Layout from './Layout.jsx';
 
 
@@ -48,6 +49,7 @@ export const PAGES = {
     "Clients": Clients,
     "Renewals": Renewals,
     "RenewalsDashboard": RenewalsDashboard,
+    "RenewalsUnified": RenewalsUnified,
 }
 
 export const pagesConfig = {
