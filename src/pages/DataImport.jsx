@@ -3,13 +3,12 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Upload, FileSpreadsheet, CheckCircle, AlertCircle, Database, Loader2,
-  FileText, Table as TableIcon, X, Eye, Info, HardDrive, AlertTriangle, Users, Merge
+  FileText, Table as TableIcon, X, Eye, Info, HardDrive, AlertTriangle
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import DuplicateManager from '@/components/data/DuplicateManager';
 import {
   Alert,
   AlertDescription,
@@ -115,22 +114,12 @@ export default function DataImport() {
   const [showEditor, setShowEditor] = useState(false);
   const [duplicatesInSystem, setDuplicatesInSystem] = useState([]);
   const [importMode, setImportMode] = useState('clients'); // 'clients' ou 'certificates'
-  const [showDuplicateManager, setShowDuplicateManager] = useState(false);
 
   // Buscar clientes e certificados existentes para checar duplicados
   const { data: existingClients = [] } = useQuery({
     queryKey: ['existing-clients-for-import'],
-    queryFn: () => base44.entities.Client.list('-created_date', 5000),
+    queryFn: () => base44.entities.Client.list('-created_date', 1000),
   });
-
-  // Buscar usuário atual para verificar permissões
-  const { data: user } = useQuery({
-    queryKey: ['current-user'],
-    queryFn: () => base44.auth.me(),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const isAdmin = user?.role === 'admin';
 
   const { data: existingCertificates = [] } = useQuery({
     queryKey: ['existing-certificates-for-import'],
@@ -476,26 +465,14 @@ export default function DataImport() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Banco de Dados</h1>
-          <p className="text-slate-500">Visualize, edite e gerencie todos os cadastros do sistema</p>
+          <p className="text-slate-500">Importe e limpe dados de planilhas e PDFs</p>
         </div>
-        <div className="flex gap-3">
-          {isAdmin && existingClients.length > 0 && (
-            <Button
-              onClick={() => setShowDuplicateManager(true)}
-              variant="outline"
-              className="border-amber-600 text-amber-600 hover:bg-amber-50"
-            >
-              <Merge className="w-4 h-4 mr-2" />
-              Unificar Cadastros
-            </Button>
-          )}
-          {showEditor && (
-            <Button variant="outline" onClick={resetUpload}>
-              <X className="w-4 h-4 mr-2" />
-              Nova Importação
-            </Button>
-          )}
-        </div>
+        {showEditor && (
+          <Button variant="outline" onClick={resetUpload}>
+            <X className="w-4 h-4 mr-2" />
+            Nova Importação
+          </Button>
+        )}
       </div>
 
       {/* Status Messages */}
@@ -810,13 +787,6 @@ export default function DataImport() {
           </CardContent>
         </Card>
       )}
-
-      {/* Duplicate Manager */}
-      <DuplicateManager
-        clients={existingClients}
-        open={showDuplicateManager}
-        onOpenChange={setShowDuplicateManager}
-      />
     </div>
   );
 }
