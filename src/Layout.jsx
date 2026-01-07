@@ -166,7 +166,6 @@ export default function Layout({ children, currentPageName }) {
     { name: 'Dashboard', icon: BarChart3, page: 'Dashboard' },
     { name: 'Campanhas', icon: Target, page: 'Campaigns' },
     { name: 'Relatórios', icon: FileText, page: 'Reports' },
-    { name: 'Renovações', icon: RefreshCw, page: 'RenewalsUnified' },
     { name: 'Banco de Dados', icon: Database, page: 'DataImport' },
     { name: 'Notas', icon: StickyNote, page: 'Notes' },
     { name: 'Chat', icon: MessageSquare, page: 'Chat' },
