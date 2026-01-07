@@ -66,48 +66,53 @@ export default function Renewals() {
   const { data: certificates = [], isLoading } = useQuery({
     queryKey: ['certificates'],
     queryFn: async () => {
-      // Buscar certificados da entidade Certificate
-      const certs = await base44.entities.Certificate.list('-expiry_date', 1000);
+      // Buscar TODOS os clientes
+      const allClients = await base44.entities.Client.list('-created_date', 2000);
       
-      // Buscar clientes com certificado digital ativo
-      const clients = await base44.entities.Client.filter({ has_certificate: true });
+      // Filtrar apenas clientes com certificado digital E data de validade
+      const clientsWithCert = allClients.filter(c => 
+        c.has_certificate === true && c.certificate_expiry_date
+      );
       
-      // Converter clientes com certificado para formato de certificado
-      const clientCerts = clients
-        .filter(c => c.certificate_expiry_date) // Apenas com data de validade
-        .map(c => ({
-          id: `client-${c.id}`,
-          client_id: c.id,
-          client_name: c.client_name,
-          client_email: c.email || '',
-          client_phone: c.phone || c.whatsapp || '',
-          certificate_type: c.certificate_type || 'e_cpf_a3',
-          issue_date: null,
-          expiry_date: c.certificate_expiry_date,
-          status: 'ativo',
-          renewal_status: 'pendente',
-          assigned_agent: c.assigned_agent || '',
-          notes: 'Cliente cadastrado manualmente',
-        }));
+      // Buscar certificados existentes na entidade Certificate
+      const existingCerts = await base44.entities.Certificate.list('-expiry_date', 2000);
       
-      // Combinar e remover duplicatas (priorizar Certificate sobre Client)
+      // Criar mapa de certificados por client_id
       const certMap = new Map();
-      
-      // Adicionar certificados da entidade Certificate
-      certs.forEach(cert => {
+      existingCerts.forEach(cert => {
         if (cert.client_id) {
           certMap.set(cert.client_id, cert);
         }
       });
       
-      // Adicionar clientes com certificado que não estão na entidade Certificate
-      clientCerts.forEach(cert => {
-        if (!certMap.has(cert.client_id)) {
-          certMap.set(cert.client_id, cert);
+      // Processar TODOS os clientes com certificado
+      const allCertificates = clientsWithCert.map(client => {
+        // Verificar se já existe certificado na entidade
+        const existingCert = certMap.get(client.id);
+        
+        if (existingCert) {
+          // Retornar certificado existente (já está na base)
+          return existingCert;
+        } else {
+          // Criar objeto de certificado temporário do cliente
+          return {
+            id: `client-${client.id}`,
+            client_id: client.id,
+            client_name: client.client_name,
+            client_email: client.email || '',
+            client_phone: client.phone || client.whatsapp || '',
+            certificate_type: client.certificate_type || 'e_cpf_a3',
+            issue_date: null,
+            expiry_date: client.certificate_expiry_date,
+            status: 'ativo',
+            renewal_status: client.renewal_status || 'pendente',
+            assigned_agent: client.assigned_agent || '',
+            notes: 'Certificado do cadastro - use o botão de sincronização',
+          };
         }
       });
       
-      return Array.from(certMap.values());
+      return allCertificates;
     },
   });
 
