@@ -1,0 +1,385 @@
+import React, { useState, useMemo } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { 
+  AlertTriangle, Users, Merge, X, Check, 
+  Phone, Mail, Building2, User, CheckCircle2,
+  ArrowRight
+} from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+
+export default function DuplicateManager({ clients, open, onOpenChange }) {
+  const queryClient = useQueryClient();
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [primaryClientId, setPrimaryClientId] = useState(null);
+
+  // Detectar grupos de duplicados
+  const duplicateGroups = useMemo(() => {
+    const groups = [];
+    const seen = new Map();
+    
+    clients.forEach(client => {
+      const identifiers = [
+        client.cpf?.replace(/\D/g, ''),
+        client.cnpj?.replace(/\D/g, ''),
+        client.email?.toLowerCase(),
+        client.phone?.replace(/\D/g, ''),
+        client.whatsapp?.replace(/\D/g, '')
+      ].filter(Boolean);
+      
+      identifiers.forEach(id => {
+        if (!seen.has(id)) {
+          seen.set(id, []);
+        }
+        if (!seen.get(id).some(c => c.id === client.id)) {
+          seen.get(id).push(client);
+        }
+      });
+    });
+    
+    seen.forEach((clientList, identifier) => {
+      if (clientList.length > 1) {
+        const existingGroup = groups.find(g => 
+          g.clients.some(c => clientList.some(cl => cl.id === c.id))
+        );
+        
+        if (existingGroup) {
+          clientList.forEach(c => {
+            if (!existingGroup.clients.some(ec => ec.id === c.id)) {
+              existingGroup.clients.push(c);
+            }
+          });
+          if (!existingGroup.reasons.includes(identifier)) {
+            existingGroup.reasons.push(identifier);
+          }
+        } else {
+          groups.push({
+            clients: [...clientList],
+            reasons: [identifier]
+          });
+        }
+      }
+    });
+    
+    return groups;
+  }, [clients]);
+
+  const mergeMutation = useMutation({
+    mutationFn: async ({ primaryId, duplicateIds }) => {
+      // Buscar todos os registros relacionados e transferi-los para o cliente principal
+      const [interactions, appointments] = await Promise.all([
+        base44.entities.Interaction.list(),
+        base44.entities.Appointment.list()
+      ]);
+
+      // Atualizar interações
+      const interactionsToUpdate = interactions.filter(i => 
+        duplicateIds.includes(i.client_id)
+      );
+      await Promise.all(
+        interactionsToUpdate.map(i => 
+          base44.entities.Interaction.update(i.id, { client_id: primaryId })
+        )
+      );
+
+      // Atualizar agendamentos
+      const appointmentsToUpdate = appointments.filter(a => 
+        duplicateIds.includes(a.client_id)
+      );
+      await Promise.all(
+        appointmentsToUpdate.map(a => 
+          base44.entities.Appointment.update(a.id, { client_id: primaryId })
+        )
+      );
+
+      // Deletar clientes duplicados
+      await Promise.all(
+        duplicateIds.map(id => base44.entities.Client.delete(id))
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['clients']);
+      setSelectedGroup(null);
+      setPrimaryClientId(null);
+    },
+  });
+
+  const handleSelectGroup = (group) => {
+    setSelectedGroup(group);
+    setPrimaryClientId(group.clients[0].id);
+  };
+
+  const handleMerge = () => {
+    if (!primaryClientId || !selectedGroup) return;
+
+    const duplicateIds = selectedGroup.clients
+      .filter(c => c.id !== primaryClientId)
+      .map(c => c.id);
+
+    if (confirm(`Confirma a unificação de ${duplicateIds.length} cadastro(s) duplicado(s)? Esta ação não pode ser desfeita.`)) {
+      mergeMutation.mutate({ primaryId: primaryClientId, duplicateIds });
+    }
+  };
+
+  const CompareField = ({ label, clients, field, icon: Icon }) => {
+    const values = clients.map(c => c[field]).filter(Boolean);
+    const allSame = values.every(v => v === values[0]);
+    
+    return (
+      <div className="py-3 border-b border-slate-100 last:border-0">
+        <div className="flex items-center gap-2 mb-2">
+          {Icon && <Icon className="w-4 h-4 text-slate-400" />}
+          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</span>
+          {allSame && values.length > 0 && (
+            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+              <CheckCircle2 className="w-3 h-3 mr-1" /> Igual
+            </Badge>
+          )}
+        </div>
+        <div className="grid gap-2">
+          {clients.map((client, idx) => (
+            <div 
+              key={client.id} 
+              className={`flex items-center gap-2 text-sm p-2 rounded ${
+                client.id === primaryClientId 
+                  ? 'bg-blue-50 border border-blue-200 font-medium' 
+                  : 'bg-slate-50'
+              }`}
+            >
+              <span className="text-slate-400 text-xs">#{idx + 1}</span>
+              <span className={client[field] ? 'text-slate-800' : 'text-slate-400 italic'}>
+                {client[field] || 'Não informado'}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <Dialog open={open && !selectedGroup} onOpenChange={(o) => !o && onOpenChange(false)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-amber-600" />
+              Gerenciar Cadastros Duplicados
+              <Badge variant="outline" className="ml-2">
+                {duplicateGroups.length} grupos encontrados
+              </Badge>
+            </DialogTitle>
+          </DialogHeader>
+
+          {duplicateGroups.length === 0 ? (
+            <div className="text-center py-12">
+              <CheckCircle2 className="w-16 h-16 mx-auto mb-4 text-green-500" />
+              <p className="text-lg font-medium text-slate-700">Nenhum duplicado encontrado!</p>
+              <p className="text-slate-500 mt-2">Todos os cadastros estão únicos.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {duplicateGroups.map((group, idx) => (
+                <Card key={idx} className="border-amber-200 bg-amber-50/50">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-600" />
+                          Grupo {idx + 1} - {group.clients.length} cadastros
+                        </CardTitle>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Motivos: {group.reasons.map(r => 
+                            r.includes('@') ? 'E-mail' : 
+                            r.length === 11 ? 'CPF' : 
+                            r.length === 14 ? 'CNPJ' : 'Telefone'
+                          ).join(', ')}
+                        </p>
+                      </div>
+                      <Button 
+                        size="sm"
+                        onClick={() => handleSelectGroup(group)}
+                        className="bg-amber-600 hover:bg-amber-700"
+                      >
+                        <Merge className="w-4 h-4 mr-2" />
+                        Revisar
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {group.clients.map((client) => (
+                        <div key={client.id} className="p-3 bg-white rounded-lg border border-slate-200">
+                          <p className="font-medium text-slate-800 truncate">{client.client_name}</p>
+                          {client.company_name && (
+                            <p className="text-xs text-slate-500 truncate">{client.company_name}</p>
+                          )}
+                          {client.email && (
+                            <p className="text-xs text-slate-600 mt-1 flex items-center gap-1">
+                              <Mail className="w-3 h-3" /> {client.email}
+                            </p>
+                          )}
+                          {(client.phone || client.whatsapp) && (
+                            <p className="text-xs text-slate-600 flex items-center gap-1">
+                              <Phone className="w-3 h-3" /> {client.phone || client.whatsapp}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Revisão e Unificação */}
+      <Dialog open={!!selectedGroup} onOpenChange={(o) => !o && setSelectedGroup(null)}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Merge className="w-5 h-5 text-blue-600" />
+              Revisar e Unificar Cadastros
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedGroup && (
+            <div className="space-y-6">
+              {/* Seleção do Registro Principal */}
+              <Card className="border-blue-200 bg-blue-50/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">
+                    1. Selecione o cadastro principal (será mantido)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <RadioGroup value={primaryClientId} onValueChange={setPrimaryClientId}>
+                    <div className="grid gap-3">
+                      {selectedGroup.clients.map((client, idx) => (
+                        <div key={client.id} className="flex items-start gap-3">
+                          <RadioGroupItem value={client.id} id={client.id} className="mt-1" />
+                          <Label 
+                            htmlFor={client.id} 
+                            className="flex-1 cursor-pointer p-3 rounded-lg border-2 transition-all hover:bg-white"
+                            style={{
+                              borderColor: client.id === primaryClientId ? '#3b82f6' : '#e2e8f0',
+                              backgroundColor: client.id === primaryClientId ? '#eff6ff' : '#fff'
+                            }}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-slate-800">
+                                Cadastro #{idx + 1}
+                              </span>
+                              {client.id === primaryClientId && (
+                                <Badge className="bg-blue-600">Principal</Badge>
+                              )}
+                            </div>
+                            <div className="space-y-1 text-sm">
+                              <p><strong>Nome:</strong> {client.client_name}</p>
+                              {client.company_name && <p><strong>Empresa:</strong> {client.company_name}</p>}
+                              {client.email && <p><strong>E-mail:</strong> {client.email}</p>}
+                              {client.phone && <p><strong>Telefone:</strong> {client.phone}</p>}
+                              <p className="text-xs text-slate-500 mt-2">
+                                Criado em: {new Date(client.created_date).toLocaleDateString('pt-BR')}
+                              </p>
+                            </div>
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </RadioGroup>
+                </CardContent>
+              </Card>
+
+              {/* Comparação de Campos */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">
+                    2. Compare os dados (o cadastro principal será mantido)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-0">
+                  <CompareField label="Nome" clients={selectedGroup.clients} field="client_name" icon={User} />
+                  <CompareField label="Empresa" clients={selectedGroup.clients} field="company_name" icon={Building2} />
+                  <CompareField label="CPF" clients={selectedGroup.clients} field="cpf" />
+                  <CompareField label="CNPJ" clients={selectedGroup.clients} field="cnpj" />
+                  <CompareField label="E-mail" clients={selectedGroup.clients} field="email" icon={Mail} />
+                  <CompareField label="Telefone" clients={selectedGroup.clients} field="phone" icon={Phone} />
+                  <CompareField label="WhatsApp" clients={selectedGroup.clients} field="whatsapp" />
+                  <CompareField label="Área de Atuação" clients={selectedGroup.clients} field="business_area" />
+                  <CompareField label="Observações" clients={selectedGroup.clients} field="notes" />
+                </CardContent>
+              </Card>
+
+              {/* Informações da Unificação */}
+              <Card className="border-amber-200 bg-amber-50/50">
+                <CardContent className="pt-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium text-slate-800 mb-2">O que vai acontecer:</p>
+                      <ul className="space-y-1 text-slate-600">
+                        <li className="flex items-center gap-2">
+                          <ArrowRight className="w-4 h-4" />
+                          O cadastro principal será mantido com todos os seus dados
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <ArrowRight className="w-4 h-4" />
+                          Todas as interações e agendamentos dos duplicados serão transferidos para o principal
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <ArrowRight className="w-4 h-4" />
+                          Os cadastros duplicados serão removidos permanentemente
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Ações */}
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setSelectedGroup(null)}
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={handleMerge}
+                  disabled={!primaryClientId || mergeMutation.isPending}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {mergeMutation.isPending ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                      Unificando...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Confirmar Unificação
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
