@@ -58,8 +58,26 @@ export default function RenewalManagement() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [agentFilter, setAgentFilter] = useState('all');
+  const [selectedPeriods, setSelectedPeriods] = useState([]);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(null);
+
+  // Períodos disponíveis
+  const availablePeriods = [
+    { value: 45, label: 'Até 45 dias' },
+    { value: 60, label: 'Até 60 dias' },
+    { value: 75, label: 'Até 75 dias' },
+    { value: 90, label: 'Até 90 dias' },
+  ];
+
+  // Alternar seleção de período
+  const togglePeriod = (period) => {
+    setSelectedPeriods(prev => 
+      prev.includes(period) 
+        ? prev.filter(p => p !== period)
+        : [...prev, period]
+    );
+  };
 
   const [user, setUser] = useState(null);
   React.useEffect(() => {
@@ -157,7 +175,7 @@ export default function RenewalManagement() {
 
   const today = new Date();
 
-  // Filtros aplicados
+  // Filtros aplicados (incluindo períodos)
   const filteredData = renewalData.filter(record => {
     const matchesSearch = !searchTerm || 
       record.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -166,7 +184,15 @@ export default function RenewalManagement() {
     const matchesStatus = statusFilter === 'all' || record.renewal_status === statusFilter;
     const matchesAgent = agentFilter === 'all' || record.assigned_agent === agentFilter;
     
-    return matchesSearch && matchesType && matchesStatus && matchesAgent;
+    // Filtro de período (consolidado - usa maior período selecionado)
+    let matchesPeriod = true;
+    if (selectedPeriods.length > 0) {
+      const maxPeriod = Math.max(...selectedPeriods);
+      const daysUntil = differenceInDays(parseISO(record.expiry_date), today);
+      matchesPeriod = daysUntil >= 0 && daysUntil <= maxPeriod;
+    }
+    
+    return matchesSearch && matchesType && matchesStatus && matchesAgent && matchesPeriod;
   });
 
   // Classificação por vencimento
@@ -564,52 +590,96 @@ export default function RenewalManagement() {
       {/* Filtros */}
       <Card className="border-0 shadow-lg">
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                placeholder="Buscar por nome ou e-mail..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
+          <div className="space-y-4">
+            {/* Filtro de Períodos */}
+            <div>
+              <p className="text-sm font-medium text-slate-700 mb-2">Período de Vencimento:</p>
+              <div className="flex flex-wrap gap-2">
+                {availablePeriods.map(period => (
+                  <Button
+                    key={period.value}
+                    variant={selectedPeriods.includes(period.value) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => togglePeriod(period.value)}
+                    className={selectedPeriods.includes(period.value) ? 
+                      "bg-[#6B2D8B] hover:bg-[#5A2577]" : ""
+                    }
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedPeriods.includes(period.value)}
+                      onChange={() => {}}
+                      className="mr-2"
+                    />
+                    {period.label}
+                  </Button>
+                ))}
+                {selectedPeriods.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedPeriods([])}
+                    className="text-slate-500"
+                  >
+                    Limpar períodos
+                  </Button>
+                )}
+              </div>
+              {selectedPeriods.length > 0 && (
+                <p className="text-xs text-slate-500 mt-2">
+                  Exibindo certificados que vencem em até {Math.max(...selectedPeriods)} dias
+                </p>
+              )}
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="pendente">Pendente</SelectItem>
-                <SelectItem value="em_contato">Em Contato</SelectItem>
-                <SelectItem value="renovado">Renovado</SelectItem>
-                <SelectItem value="nao_renovado">Não Renovado</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {Object.entries(CERTIFICATE_TYPES).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={agentFilter} onValueChange={setAgentFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Responsável" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {accessRecords.map(u => (
-                  <SelectItem key={u.user_email} value={u.user_email}>
-                    {u.nickname || u.user_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+            {/* Outros Filtros */}
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Buscar por nome ou e-mail..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="em_contato">Em Contato</SelectItem>
+                  <SelectItem value="renovado">Renovado</SelectItem>
+                  <SelectItem value="nao_renovado">Não Renovado</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {Object.entries(CERTIFICATE_TYPES).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={agentFilter} onValueChange={setAgentFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {accessRecords.map(u => (
+                    <SelectItem key={u.user_email} value={u.user_email}>
+                      {u.nickname || u.user_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
