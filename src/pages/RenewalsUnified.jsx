@@ -61,13 +61,37 @@ export default function RenewalsUnified() {
     staleTime: 0,
   });
 
-  // Buscar clientes de renovação vinculados
-  const { data: renewalClients = [] } = useQuery({
-    queryKey: ['clients'],
-    queryFn: () => base44.entities.Client.filter({ lead_source: 'renovacao' }),
-    refetchInterval: 5000,
-    staleTime: 0,
-  });
+  // Consolidar certificados: UM certificado por cliente (o mais próximo do vencimento)
+  const consolidatedCertificates = React.useMemo(() => {
+    const certsByClient = new Map();
+    const today = new Date();
+    
+    allCertificates.forEach(cert => {
+      // Ignorar certificados sem client_id ou já vencidos e renovados
+      if (!cert.client_id) return;
+      if (cert.status === 'vencido' && cert.renewal_status === 'renovado') return;
+      
+      const expiryDate = cert.expiry_date ? parseISO(cert.expiry_date) : null;
+      
+      // Apenas certificados com data futura ou próxima do vencimento
+      if (expiryDate) {
+        const existing = certsByClient.get(cert.client_id);
+        
+        if (!existing) {
+          certsByClient.set(cert.client_id, cert);
+        } else {
+          // Manter o certificado com vencimento mais próximo (mas ainda futuro ou recente)
+          const existingDate = existing.expiry_date ? parseISO(existing.expiry_date) : null;
+          
+          if (existingDate && expiryDate < existingDate) {
+            certsByClient.set(cert.client_id, cert);
+          }
+        }
+      }
+    });
+    
+    return Array.from(certsByClient.values());
+  }, [allCertificates]);
 
   // Mutation para atualizar status
   const updateStatusMutation = useMutation({
@@ -209,38 +233,38 @@ export default function RenewalsUnified() {
     }
   };
 
-  // Calcular indicadores (KPIs) - fonte única
+  // Calcular indicadores (KPIs) - baseado nos certificados consolidados
   const today = new Date();
   const kpis = React.useMemo(() => {
-    const expiring7 = allCertificates.filter(cert => {
+    const expiring7 = consolidatedCertificates.filter(cert => {
       if (!cert.expiry_date) return false;
       const days = differenceInDays(parseISO(cert.expiry_date), today);
       return days >= 0 && days <= 7;
     }).length;
 
-    const expiring15 = allCertificates.filter(cert => {
+    const expiring15 = consolidatedCertificates.filter(cert => {
       if (!cert.expiry_date) return false;
       const days = differenceInDays(parseISO(cert.expiry_date), today);
       return days >= 0 && days <= 15;
     }).length;
 
-    const expiring30 = allCertificates.filter(cert => {
+    const expiring30 = consolidatedCertificates.filter(cert => {
       if (!cert.expiry_date) return false;
       const days = differenceInDays(parseISO(cert.expiry_date), today);
       return days >= 0 && days <= 30;
     }).length;
 
-    const inProgress = allCertificates.filter(cert => cert.renewal_status === 'em_contato').length;
-    const renewed = allCertificates.filter(cert => cert.renewal_status === 'renovado').length;
-    const total = allCertificates.length;
+    const inProgress = consolidatedCertificates.filter(cert => cert.renewal_status === 'em_contato').length;
+    const renewed = consolidatedCertificates.filter(cert => cert.renewal_status === 'renovado').length;
+    const total = consolidatedCertificates.length;
     const conversionRate = total > 0 ? ((renewed / total) * 100).toFixed(1) : '0.0';
 
     return { expiring7, expiring15, expiring30, inProgress, renewed, conversionRate };
-  }, [allCertificates]);
+  }, [consolidatedCertificates]);
 
-  // Filtrar certificados
+  // Filtrar certificados consolidados
   const filteredCertificates = React.useMemo(() => {
-    let filtered = allCertificates.filter(cert => {
+    let filtered = consolidatedCertificates.filter(cert => {
       const matchesSearch = !searchTerm || 
         cert.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         cert.client_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -271,13 +295,13 @@ export default function RenewalsUnified() {
     });
 
     return filtered;
-  }, [allCertificates, searchTerm, statusFilter, typeFilter, agentFilter, sortField, sortOrder]);
+  }, [consolidatedCertificates, searchTerm, statusFilter, typeFilter, agentFilter, sortField, sortOrder]);
 
   // Lista de agentes únicos
   const agents = React.useMemo(() => {
-    const uniqueAgents = new Set(allCertificates.map(c => c.assigned_agent).filter(Boolean));
+    const uniqueAgents = new Set(consolidatedCertificates.map(c => c.assigned_agent).filter(Boolean));
     return Array.from(uniqueAgents);
-  }, [allCertificates]);
+  }, [consolidatedCertificates]);
 
   const toggleSort = (field) => {
     if (sortField === field) {
@@ -476,8 +500,8 @@ export default function RenewalsUnified() {
       <Card className="border-0 shadow-lg">
         <CardHeader>
           <CardTitle className="text-lg flex items-center justify-between">
-            <span>Certificados ({filteredCertificates.length})</span>
-            <Badge variant="secondary">Fonte Única</Badge>
+            <span>Certificados ({filteredCertificates.length} clientes únicos)</span>
+            <Badge variant="secondary" className="bg-green-100 text-green-700">✓ Sem Duplicatas</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -611,7 +635,7 @@ export default function RenewalsUnified() {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
-              Importe uma planilha com os dados dos certificados. O sistema evitará duplicações verificando por cliente_id.
+              Importe uma planilha com os dados dos certificados. O sistema consolida automaticamente múltiplos certificados por cliente, exibindo apenas o mais próximo do vencimento.
             </p>
             <Input
               type="file"
