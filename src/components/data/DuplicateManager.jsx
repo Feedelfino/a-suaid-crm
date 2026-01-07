@@ -23,6 +23,8 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [primaryClientId, setPrimaryClientId] = useState(null);
   const [selectedClientsInGroup, setSelectedClientsInGroup] = useState([]);
+  const [ignoredGroups, setIgnoredGroups] = useState(new Set());
+  const [ignoredClients, setIgnoredClients] = useState(new Set());
 
   // Função para calcular similaridade entre strings
   const calculateSimilarity = (str1, str2) => {
@@ -227,6 +229,22 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
     }
   };
 
+  const handleIgnoreGroup = (groupId) => {
+    setIgnoredGroups(prev => new Set([...prev, groupId]));
+    if (selectedGroup?.id === groupId) {
+      setSelectedGroup(null);
+    }
+  };
+
+  const handleIgnoreClient = (clientId) => {
+    setIgnoredClients(prev => new Set([...prev, clientId]));
+  };
+
+  const handleRestoreIgnored = () => {
+    setIgnoredGroups(new Set());
+    setIgnoredClients(new Set());
+  };
+
   const CompareField = ({ label, clients, field, icon: Icon }) => {
     const values = clients.map(c => c[field]).filter(Boolean);
     const allSame = values.every(v => v === values[0]);
@@ -375,6 +393,7 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                               checked={isSelected}
                               onChange={() => toggleClientSelection(client.id)}
                               className="w-4 h-4 rounded border-slate-300"
+                              title="Incluir na unificação"
                             />
                             <input
                               type="radio"
@@ -383,6 +402,7 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                               onChange={() => setPrimaryClientId(client.id)}
                               disabled={!isSelected}
                               className="w-4 h-4"
+                              title="Definir como principal"
                             />
                           </div>
                           <div 
@@ -396,7 +416,7 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                                 Cadastro #{idx + 1}
                               </span>
                               <div className="flex gap-2">
-                                {!isSelected && <Badge variant="outline">Excluído</Badge>}
+                                {!isSelected && <Badge variant="outline">Não unificar</Badge>}
                                 {isPrimary && <Badge className="bg-blue-600">Principal</Badge>}
                               </div>
                             </div>
@@ -411,6 +431,15 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                               </p>
                             </div>
                           </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleIgnoreClient(client.id)}
+                            className="text-slate-400 hover:text-red-600 mt-1"
+                            title="Marcar como não duplicado"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
                         </div>
                       );
                     })}
