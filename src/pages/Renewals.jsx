@@ -36,7 +36,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import RenewalSyncUtility from '@/components/renewals/RenewalSyncUtility';
 
 const CERTIFICATE_TYPES = {
   e_cpf_a1: 'e-CPF A1',
@@ -65,55 +64,7 @@ export default function Renewals() {
 
   const { data: certificates = [], isLoading } = useQuery({
     queryKey: ['certificates'],
-    queryFn: async () => {
-      // Buscar TODOS os clientes
-      const allClients = await base44.entities.Client.list('-created_date', 2000);
-      
-      // Filtrar apenas clientes com certificado digital E data de validade
-      const clientsWithCert = allClients.filter(c => 
-        c.has_certificate === true && c.certificate_expiry_date
-      );
-      
-      // Buscar certificados existentes na entidade Certificate
-      const existingCerts = await base44.entities.Certificate.list('-expiry_date', 2000);
-      
-      // Criar mapa de certificados por client_id
-      const certMap = new Map();
-      existingCerts.forEach(cert => {
-        if (cert.client_id) {
-          certMap.set(cert.client_id, cert);
-        }
-      });
-      
-      // Processar TODOS os clientes com certificado
-      const allCertificates = clientsWithCert.map(client => {
-        // Verificar se já existe certificado na entidade
-        const existingCert = certMap.get(client.id);
-        
-        if (existingCert) {
-          // Retornar certificado existente (já está na base)
-          return existingCert;
-        } else {
-          // Criar objeto de certificado temporário do cliente
-          return {
-            id: `client-${client.id}`,
-            client_id: client.id,
-            client_name: client.client_name,
-            client_email: client.email || '',
-            client_phone: client.phone || client.whatsapp || '',
-            certificate_type: client.certificate_type || 'e_cpf_a3',
-            issue_date: null,
-            expiry_date: client.certificate_expiry_date,
-            status: 'ativo',
-            renewal_status: client.renewal_status || 'pendente',
-            assigned_agent: client.assigned_agent || '',
-            notes: 'Certificado do cadastro - use o botão de sincronização',
-          };
-        }
-      });
-      
-      return allCertificates;
-    },
+    queryFn: () => base44.entities.Certificate.list('-expiry_date', 1000),
   });
 
   const updateCertificate = useMutation({
@@ -343,12 +294,7 @@ export default function Renewals() {
                     <TableRow key={cert.id}>
                       <TableCell>
                         <div>
-                          <Link 
-                            to={createPageUrl(`ClientDetails?id=${cert.client_id}`)}
-                            className="font-medium text-[#6B2D8B] hover:underline cursor-pointer"
-                          >
-                            {cert.client_name}
-                          </Link>
+                          <p className="font-medium">{cert.client_name}</p>
                           {cert.client_email && (
                             <p className="text-xs text-slate-500">{cert.client_email}</p>
                           )}
@@ -421,9 +367,6 @@ export default function Renewals() {
 
   return (
     <div className="space-y-6">
-      {/* Sincronizador */}
-      {user?.role === 'admin' && <RenewalSyncUtility />}
-
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
