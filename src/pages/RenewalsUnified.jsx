@@ -61,36 +61,64 @@ export default function RenewalsUnified() {
     staleTime: 0,
   });
 
-  // Consolidar certificados: UM certificado por cliente (o mais próximo do vencimento)
+  // CONSOLIDAÇÃO CRÍTICA: UM certificado por cliente_id (regra obrigatória)
   const consolidatedCertificates = React.useMemo(() => {
     const certsByClient = new Map();
     const today = new Date();
     
     allCertificates.forEach(cert => {
-      // Ignorar certificados sem client_id ou já vencidos e renovados
-      if (!cert.client_id) return;
-      if (cert.status === 'vencido' && cert.renewal_status === 'renovado') return;
+      // REGRA 1: Apenas certificados com client_id válido
+      if (!cert.client_id || cert.client_id === '' || cert.client_id === null) {
+        console.warn('Certificado sem client_id ignorado:', cert);
+        return;
+      }
       
-      const expiryDate = cert.expiry_date ? parseISO(cert.expiry_date) : null;
+      // REGRA 2: Ignorar certificados já vencidos E renovados (histórico)
+      if (cert.status === 'vencido' && cert.renewal_status === 'renovado') {
+        return;
+      }
       
-      // Apenas certificados com data futura ou próxima do vencimento
-      if (expiryDate) {
-        const existing = certsByClient.get(cert.client_id);
+      // REGRA 3: Verificar data de expiração
+      if (!cert.expiry_date) {
+        console.warn('Certificado sem data de expiração ignorado:', cert);
+        return;
+      }
+      
+      const expiryDate = parseISO(cert.expiry_date);
+      const existing = certsByClient.get(cert.client_id);
+      
+      if (!existing) {
+        // Primeiro certificado deste cliente
+        certsByClient.set(cert.client_id, cert);
+      } else {
+        // Já existe certificado para este cliente - escolher o mais próximo do vencimento (FUTURO)
+        const existingDate = parseISO(existing.expiry_date);
+        const daysToExpiry = differenceInDays(expiryDate, today);
+        const existingDaysToExpiry = differenceInDays(existingDate, today);
         
-        if (!existing) {
+        // Prioridade 1: Certificados futuros sobre vencidos
+        // Prioridade 2: Entre futuros, o mais próximo do vencimento
+        if (daysToExpiry >= 0 && existingDaysToExpiry < 0) {
+          // Novo é futuro, existente já venceu - substituir
           certsByClient.set(cert.client_id, cert);
-        } else {
-          // Manter o certificado com vencimento mais próximo (mas ainda futuro ou recente)
-          const existingDate = existing.expiry_date ? parseISO(existing.expiry_date) : null;
-          
-          if (existingDate && expiryDate < existingDate) {
+        } else if (daysToExpiry >= 0 && existingDaysToExpiry >= 0) {
+          // Ambos futuros - manter o mais próximo
+          if (daysToExpiry < existingDaysToExpiry) {
+            certsByClient.set(cert.client_id, cert);
+          }
+        } else if (daysToExpiry < 0 && existingDaysToExpiry < 0) {
+          // Ambos vencidos - manter o mais recente (menos vencido)
+          if (daysToExpiry > existingDaysToExpiry) {
             certsByClient.set(cert.client_id, cert);
           }
         }
+        // Se novo é vencido e existente é futuro, manter existente (não fazer nada)
       }
     });
     
-    return Array.from(certsByClient.values());
+    const result = Array.from(certsByClient.values());
+    console.log(`📊 Consolidação: ${allCertificates.length} certificados → ${result.length} clientes únicos`);
+    return result;
   }, [allCertificates]);
 
   // Mutation para atualizar status
