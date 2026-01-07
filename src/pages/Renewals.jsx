@@ -36,6 +36,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import RenewalSyncUtility from '@/components/renewals/RenewalSyncUtility';
 
 const CERTIFICATE_TYPES = {
   e_cpf_a1: 'e-CPF A1',
@@ -415,6 +416,9 @@ export default function Renewals() {
 
   return (
     <div className="space-y-6">
+      {/* Sincronizador */}
+      {user?.role === 'admin' && <RenewalSyncUtility />}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
