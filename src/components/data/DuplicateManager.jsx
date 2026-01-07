@@ -66,11 +66,16 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
 
   // Detectar grupos de duplicados
   const duplicateGroups = useMemo(() => {
+    // Filtrar clientes que foram marcados como "não duplicado"
+    const validClients = clients.filter(
+      (c) => !c.notes?.includes('[DUPLICATA IGNORADA:')
+    );
+    
     const groups = [];
     const seen = new Map();
 
     // Agrupar por CPF, CNPJ e E-mail
-    clients.forEach((client) => {
+    validClients.forEach((client) => {
       const identifiers = [
       client.cpf?.replace(/\D/g, '') ? `cpf:${client.cpf.replace(/\D/g, '')}` : null,
       client.cnpj?.replace(/\D/g, '') ? `cnpj:${client.cnpj.replace(/\D/g, '')}` : null,
@@ -113,10 +118,10 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
     });
 
     // Detectar nomes similares (similaridade > 85%)
-    for (let i = 0; i < clients.length; i++) {
-      for (let j = i + 1; j < clients.length; j++) {
-        const client1 = clients[i];
-        const client2 = clients[j];
+    for (let i = 0; i < validClients.length; i++) {
+      for (let j = i + 1; j < validClients.length; j++) {
+        const client1 = validClients[i];
+        const client2 = validClients[j];
 
         const similarity = calculateSimilarity(client1.client_name, client2.client_name);
 
@@ -229,15 +234,54 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
     }
   };
 
-  const handleIgnoreGroup = (groupId) => {
-    setIgnoredGroups((prev) => new Set([...prev, groupId]));
-    if (selectedGroup?.id === groupId) {
-      setSelectedGroup(null);
+  const handleIgnoreGroup = async (groupId, group) => {
+    // Adicionar tag aos clientes do grupo para persistir no sistema
+    const duplicateTag = `not_duplicate_${Date.now()}`;
+    
+    try {
+      await Promise.all(
+        group.clients.map((client) =>
+          base44.entities.Client.update(client.id, {
+            notes: client.notes
+              ? `${client.notes}\n[DUPLICATA IGNORADA: ${duplicateTag}]`
+              : `[DUPLICATA IGNORADA: ${duplicateTag}]`,
+          })
+        )
+      );
+      
+      // Atualizar estado local
+      setIgnoredGroups((prev) => new Set([...prev, groupId]));
+      if (selectedGroup?.id === groupId) {
+        setSelectedGroup(null);
+      }
+      
+      // Recarregar dados
+      queryClient.invalidateQueries(['clients']);
+    } catch (error) {
+      console.error('Erro ao marcar como não duplicado:', error);
+      alert('Erro ao marcar como não duplicado. Tente novamente.');
     }
   };
 
-  const handleIgnoreClient = (clientId) => {
-    setIgnoredClients((prev) => new Set([...prev, clientId]));
+  const handleIgnoreClient = async (clientId) => {
+    const duplicateTag = `not_duplicate_single_${Date.now()}`;
+    
+    try {
+      const client = selectedGroup?.clients.find((c) => c.id === clientId);
+      if (client) {
+        await base44.entities.Client.update(clientId, {
+          notes: client.notes
+            ? `${client.notes}\n[DUPLICATA IGNORADA: ${duplicateTag}]`
+            : `[DUPLICATA IGNORADA: ${duplicateTag}]`,
+        });
+      }
+      
+      setIgnoredClients((prev) => new Set([...prev, clientId]));
+      queryClient.invalidateQueries(['clients']);
+    } catch (error) {
+      console.error('Erro ao marcar cliente como não duplicado:', error);
+      alert('Erro ao marcar como não duplicado. Tente novamente.');
+    }
   };
 
   const handleRestoreIgnored = () => {
@@ -336,7 +380,7 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                         <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleIgnoreGroup(`group-${idx}`)}
+                      onClick={() => handleIgnoreGroup(`group-${idx}`, group)}
                       className="text-slate-600">
 
                           Não é duplicado
