@@ -166,15 +166,14 @@ export default function Layout({ children, currentPageName }) {
     { name: 'Dashboard', icon: BarChart3, page: 'Dashboard' },
     { name: 'Campanhas', icon: Target, page: 'Campaigns' },
     { name: 'Relatórios', icon: FileText, page: 'Reports' },
-    { name: 'Renovações', icon: RefreshCw, page: 'Renewals' },
-    { name: 'Dashboard Renovação', icon: RefreshCw, page: 'RenewalsDashboard' },
+    { name: 'Gestão de Renovações', icon: RefreshCw, page: 'RenewalManagement' },
     { name: 'Banco de Dados', icon: Database, page: 'DataImport' },
     { name: 'Notas', icon: StickyNote, page: 'Notes' },
     { name: 'Chat', icon: MessageSquare, page: 'Chat' },
-        { name: 'Central de Ajuda', icon: BookOpen, page: 'HelpCenter' },
-        // Admin menu only visible to admins
-        ...(isAdmin ? [{ name: 'Administração', icon: Settings, page: 'Admin' }] : []),
-      ];
+    { name: 'Central de Ajuda', icon: BookOpen, page: 'HelpCenter' },
+    // Admin menu only visible to admins
+    ...(isAdmin ? [{ name: 'Administração', icon: Settings, page: 'Admin' }] : []),
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">

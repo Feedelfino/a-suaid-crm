@@ -21,6 +21,7 @@ import Reports from './pages/Reports';
 import SalesPipeline from './pages/SalesPipeline';
 import Schedule from './pages/Schedule';
 import Tasks from './pages/Tasks';
+import RenewalManagement from './pages/RenewalManagement';
 import __Layout from './Layout.jsx';
 
 
@@ -48,6 +49,7 @@ export const PAGES = {
     "SalesPipeline": SalesPipeline,
     "Schedule": Schedule,
     "Tasks": Tasks,
+    "RenewalManagement": RenewalManagement,
 }
 
 export const pagesConfig = {
