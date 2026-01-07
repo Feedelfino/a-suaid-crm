@@ -17,7 +17,6 @@ import MigrationControl from './pages/MigrationControl';
 import Notes from './pages/Notes';
 import Renewals from './pages/Renewals';
 import RenewalsDashboard from './pages/RenewalsDashboard';
-import RenewalsUnified from './pages/RenewalsUnified';
 import Reports from './pages/Reports';
 import SalesPipeline from './pages/SalesPipeline';
 import Schedule from './pages/Schedule';
@@ -45,7 +44,6 @@ export const PAGES = {
     "Notes": Notes,
     "Renewals": Renewals,
     "RenewalsDashboard": RenewalsDashboard,
-    "RenewalsUnified": RenewalsUnified,
     "Reports": Reports,
     "SalesPipeline": SalesPipeline,
     "Schedule": Schedule,
