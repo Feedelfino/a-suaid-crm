@@ -37,7 +37,50 @@ export default function RenewalsDashboard() {
 
   const { data: certificates = [] } = useQuery({
     queryKey: ['certificates-dashboard'],
-    queryFn: () => base44.entities.Certificate.list('-expiry_date', 2000),
+    queryFn: async () => {
+      // Buscar certificados da entidade Certificate
+      const certs = await base44.entities.Certificate.list('-expiry_date', 2000);
+      
+      // Buscar clientes com certificado digital ativo
+      const clients = await base44.entities.Client.filter({ has_certificate: true });
+      
+      // Converter clientes com certificado para formato de certificado
+      const clientCerts = clients
+        .filter(c => c.certificate_expiry_date) // Apenas com data de validade
+        .map(c => ({
+          id: `client-${c.id}`,
+          client_id: c.id,
+          client_name: c.client_name,
+          client_email: c.email || '',
+          client_phone: c.phone || c.whatsapp || '',
+          certificate_type: c.certificate_type || 'e_cpf_a3',
+          issue_date: null,
+          expiry_date: c.certificate_expiry_date,
+          status: 'ativo',
+          renewal_status: 'pendente',
+          assigned_agent: c.assigned_agent || '',
+          notes: 'Cliente cadastrado manualmente',
+        }));
+      
+      // Combinar e remover duplicatas (priorizar Certificate sobre Client)
+      const certMap = new Map();
+      
+      // Adicionar certificados da entidade Certificate
+      certs.forEach(cert => {
+        if (cert.client_id) {
+          certMap.set(cert.client_id, cert);
+        }
+      });
+      
+      // Adicionar clientes com certificado que não estão na entidade Certificate
+      clientCerts.forEach(cert => {
+        if (!certMap.has(cert.client_id)) {
+          certMap.set(cert.client_id, cert);
+        }
+      });
+      
+      return Array.from(certMap.values());
+    },
   });
 
   const { data: clients = [] } = useQuery({
@@ -259,7 +302,12 @@ export default function RenewalsDashboard() {
                     <TableRow key={cert.id}>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{cert.client_name}</p>
+                          <Link 
+                            to={createPageUrl(`ClientDetails?id=${cert.client_id}`)}
+                            className="font-medium text-[#6B2D8B] hover:underline cursor-pointer"
+                          >
+                            {cert.client_name}
+                          </Link>
                           {cert.client_email && (
                             <p className="text-xs text-slate-500">{cert.client_email}</p>
                           )}

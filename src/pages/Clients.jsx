@@ -407,7 +407,12 @@ export default function Clients() {
                         )}
                       </div>
                       <div>
-                        <p className="font-medium text-slate-800">{client.client_name}</p>
+                        <Link 
+                          to={createPageUrl(`ClientDetails?id=${client.id}`)}
+                          className="font-medium text-[#6B2D8B] hover:underline cursor-pointer"
+                        >
+                          {client.client_name}
+                        </Link>
                         {client.client_code && (
                           <p className="text-xs text-slate-400 font-mono">#{client.client_code}</p>
                         )}
