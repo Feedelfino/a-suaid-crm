@@ -286,12 +286,24 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
       <Dialog open={open && !selectedGroup} onOpenChange={(o) => !o && onOpenChange(false)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-amber-600" />
-              Gerenciar Cadastros Duplicados
-              <Badge variant="outline" className="ml-2">
-                {duplicateGroups.length} grupos encontrados
-              </Badge>
+            <DialogTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-amber-600" />
+                Gerenciar Cadastros Duplicados
+                <Badge variant="outline" className="ml-2">
+                  {duplicateGroups.length} grupos encontrados
+                </Badge>
+              </div>
+              {(ignoredGroups.size > 0 || ignoredClients.size > 0) && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleRestoreIgnored}
+                  className="text-xs"
+                >
+                  Restaurar Ignorados ({ignoredGroups.size + ignoredClients.size})
+                </Button>
+              )}
             </DialogTitle>
           </DialogHeader>
 
@@ -303,7 +315,7 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
             </div>
           ) : (
             <div className="space-y-4">
-              {duplicateGroups.map((group, idx) => (
+              {duplicateGroups.filter((group, idx) => !ignoredGroups.has(`group-${idx}`)).map((group, idx) => (
                 <Card key={idx} className="border-amber-200 bg-amber-50/50">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
@@ -321,14 +333,24 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                           ).join(', ')}
                         </p>
                       </div>
-                      <Button 
-                        size="sm"
-                        onClick={() => handleSelectGroup(group)}
-                        className="bg-amber-600 hover:bg-amber-700"
-                      >
-                        <Merge className="w-4 h-4 mr-2" />
-                        Revisar
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleIgnoreGroup(`group-${idx}`)}
+                          className="text-slate-600"
+                        >
+                          Não é duplicado
+                        </Button>
+                        <Button 
+                          size="sm"
+                          onClick={() => handleSelectGroup(group)}
+                          className="bg-amber-600 hover:bg-amber-700"
+                        >
+                          <Merge className="w-4 h-4 mr-2" />
+                          Revisar
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -381,7 +403,7 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-3">
-                    {selectedGroup.clients.map((client, idx) => {
+                    {selectedGroup.clients.filter(c => !ignoredClients.has(c.id)).map((client, idx) => {
                       const isSelected = selectedClientsInGroup.includes(client.id);
                       const isPrimary = client.id === primaryClientId;
                       
