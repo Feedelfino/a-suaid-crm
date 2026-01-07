@@ -24,6 +24,7 @@ export default function ClientForm() {
   const clientId = urlParams.get('id');
 
   const [formData, setFormData] = useState({
+    client_code: '',
     client_name: '',
     company_name: '',
     cpf: '',
@@ -44,6 +45,18 @@ export default function ClientForm() {
     renewal_status: '',
   });
 
+  // Gerar código único se for novo cliente
+  React.useEffect(() => {
+    if (!clientId && !formData.client_code) {
+      const generateCode = () => {
+        const timestamp = Date.now().toString().slice(-6);
+        const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        return `CL${timestamp}${random}`;
+      };
+      setFormData(prev => ({ ...prev, client_code: generateCode() }));
+    }
+  }, [clientId]);
+
   // Buscar cliente se estiver editando
   const { data: client, isLoading } = useQuery({
     queryKey: ['client-edit', clientId],
@@ -59,6 +72,7 @@ export default function ClientForm() {
   useEffect(() => {
     if (client) {
       setFormData({
+        client_code: client.client_code || '',
         client_name: client.client_name || '',
         company_name: client.company_name || '',
         cpf: client.cpf || '',
@@ -142,6 +156,16 @@ export default function ClientForm() {
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="client_code">Código do Cliente</Label>
+                <Input
+                  id="client_code"
+                  value={formData.client_code}
+                  onChange={(e) => handleChange('client_code', e.target.value)}
+                  placeholder="Gerado automaticamente"
+                  disabled={!!clientId}
+                />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="client_name">Nome do Cliente *</Label>
                 <Input

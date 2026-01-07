@@ -180,6 +180,7 @@ export default function Clients() {
 
   const filteredClients = clients.filter(client => {
     const matchesSearch = !searchTerm || 
+      client.client_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.phone?.includes(searchTerm) ||
@@ -348,7 +349,7 @@ export default function Clients() {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <Input
-                placeholder="Buscar por nome, empresa, telefone..."
+                placeholder="Buscar por código, nome, empresa, telefone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -421,6 +422,9 @@ export default function Clients() {
                       </div>
                       <div>
                         <p className="font-medium text-slate-800">{client.client_name}</p>
+                        {client.client_code && (
+                          <p className="text-xs text-slate-400 font-mono">#{client.client_code}</p>
+                        )}
                         {client.company_name && (
                           <p className="text-sm text-slate-500">{client.company_name}</p>
                         )}

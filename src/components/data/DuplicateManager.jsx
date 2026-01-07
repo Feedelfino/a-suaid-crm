@@ -22,6 +22,7 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
   const queryClient = useQueryClient();
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [primaryClientId, setPrimaryClientId] = useState(null);
+  const [selectedClientsInGroup, setSelectedClientsInGroup] = useState([]);
 
   // Função para calcular similaridade entre strings
   const calculateSimilarity = (str1, str2) => {
@@ -189,14 +190,37 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
   const handleSelectGroup = (group) => {
     setSelectedGroup(group);
     setPrimaryClientId(group.clients[0].id);
+    setSelectedClientsInGroup(group.clients.map(c => c.id));
+  };
+
+  const toggleClientSelection = (clientId) => {
+    setSelectedClientsInGroup(prev => {
+      if (prev.includes(clientId)) {
+        if (prev.length <= 2) {
+          alert('É necessário manter pelo menos 2 cadastros selecionados para unificar.');
+          return prev;
+        }
+        if (clientId === primaryClientId) {
+          alert('Não é possível desmarcar o cadastro principal. Selecione outro como principal primeiro.');
+          return prev;
+        }
+        return prev.filter(id => id !== clientId);
+      } else {
+        return [...prev, clientId];
+      }
+    });
   };
 
   const handleMerge = () => {
     if (!primaryClientId || !selectedGroup) return;
 
-    const duplicateIds = selectedGroup.clients
-      .filter(c => c.id !== primaryClientId)
-      .map(c => c.id);
+    const duplicateIds = selectedClientsInGroup
+      .filter(id => id !== primaryClientId);
+
+    if (duplicateIds.length === 0) {
+      alert('Selecione pelo menos um cadastro duplicado para unificar.');
+      return;
+    }
 
     if (confirm(`Confirma a unificação de ${duplicateIds.length} cadastro(s) duplicado(s)? Esta ação não pode ser desfeita.`)) {
       mergeMutation.mutate({ primaryId: primaryClientId, duplicateIds });
@@ -338,29 +362,47 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <RadioGroup value={primaryClientId} onValueChange={setPrimaryClientId}>
-                    <div className="grid gap-3">
-                      {selectedGroup.clients.map((client, idx) => (
+                  <div className="grid gap-3">
+                    {selectedGroup.clients.map((client, idx) => {
+                      const isSelected = selectedClientsInGroup.includes(client.id);
+                      const isPrimary = client.id === primaryClientId;
+                      
+                      return (
                         <div key={client.id} className="flex items-start gap-3">
-                          <RadioGroupItem value={client.id} id={client.id} className="mt-1" />
-                          <Label 
-                            htmlFor={client.id} 
-                            className="flex-1 cursor-pointer p-3 rounded-lg border-2 transition-all hover:bg-white"
-                            style={{
-                              borderColor: client.id === primaryClientId ? '#3b82f6' : '#e2e8f0',
-                              backgroundColor: client.id === primaryClientId ? '#eff6ff' : '#fff'
-                            }}
+                          <div className="flex flex-col gap-2 pt-1">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleClientSelection(client.id)}
+                              className="w-4 h-4 rounded border-slate-300"
+                            />
+                            <input
+                              type="radio"
+                              name="primary"
+                              checked={isPrimary}
+                              onChange={() => setPrimaryClientId(client.id)}
+                              disabled={!isSelected}
+                              className="w-4 h-4"
+                            />
+                          </div>
+                          <div 
+                            className={`flex-1 p-3 rounded-lg border-2 transition-all ${
+                              !isSelected ? 'opacity-50 bg-slate-100' : 
+                              isPrimary ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white'
+                            }`}
                           >
                             <div className="flex items-center justify-between mb-2">
                               <span className="font-medium text-slate-800">
                                 Cadastro #{idx + 1}
                               </span>
-                              {client.id === primaryClientId && (
-                                <Badge className="bg-blue-600">Principal</Badge>
-                              )}
+                              <div className="flex gap-2">
+                                {!isSelected && <Badge variant="outline">Excluído</Badge>}
+                                {isPrimary && <Badge className="bg-blue-600">Principal</Badge>}
+                              </div>
                             </div>
                             <div className="space-y-1 text-sm">
                               <p><strong>Nome:</strong> {client.client_name}</p>
+                              {client.client_code && <p><strong>Código:</strong> {client.client_code}</p>}
                               {client.company_name && <p><strong>Empresa:</strong> {client.company_name}</p>}
                               {client.email && <p><strong>E-mail:</strong> {client.email}</p>}
                               {client.phone && <p><strong>Telefone:</strong> {client.phone}</p>}
@@ -368,11 +410,15 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                                 Criado em: {new Date(client.created_date).toLocaleDateString('pt-BR')}
                               </p>
                             </div>
-                          </Label>
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  </RadioGroup>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-3 flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span>Use o checkbox para incluir/excluir cadastros da unificação. Use o radio button para definir qual será o principal (mantido).</span>
+                  </p>
                 </CardContent>
               </Card>
 
@@ -380,19 +426,20 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">
-                    2. Compare os dados (o cadastro principal será mantido)
+                    2. Compare os dados (cadastros não selecionados serão removidos)
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-0">
-                  <CompareField label="Nome" clients={selectedGroup.clients} field="client_name" icon={User} />
-                  <CompareField label="Empresa" clients={selectedGroup.clients} field="company_name" icon={Building2} />
-                  <CompareField label="CPF" clients={selectedGroup.clients} field="cpf" />
-                  <CompareField label="CNPJ" clients={selectedGroup.clients} field="cnpj" />
-                  <CompareField label="E-mail" clients={selectedGroup.clients} field="email" icon={Mail} />
-                  <CompareField label="Telefone" clients={selectedGroup.clients} field="phone" icon={Phone} />
-                  <CompareField label="WhatsApp" clients={selectedGroup.clients} field="whatsapp" />
-                  <CompareField label="Área de Atuação" clients={selectedGroup.clients} field="business_area" />
-                  <CompareField label="Observações" clients={selectedGroup.clients} field="notes" />
+                  <CompareField label="Código" clients={selectedGroup.clients.filter(c => selectedClientsInGroup.includes(c.id))} field="client_code" />
+                  <CompareField label="Nome" clients={selectedGroup.clients.filter(c => selectedClientsInGroup.includes(c.id))} field="client_name" icon={User} />
+                  <CompareField label="Empresa" clients={selectedGroup.clients.filter(c => selectedClientsInGroup.includes(c.id))} field="company_name" icon={Building2} />
+                  <CompareField label="CPF" clients={selectedGroup.clients.filter(c => selectedClientsInGroup.includes(c.id))} field="cpf" />
+                  <CompareField label="CNPJ" clients={selectedGroup.clients.filter(c => selectedClientsInGroup.includes(c.id))} field="cnpj" />
+                  <CompareField label="E-mail" clients={selectedGroup.clients.filter(c => selectedClientsInGroup.includes(c.id))} field="email" icon={Mail} />
+                  <CompareField label="Telefone" clients={selectedGroup.clients.filter(c => selectedClientsInGroup.includes(c.id))} field="phone" icon={Phone} />
+                  <CompareField label="WhatsApp" clients={selectedGroup.clients.filter(c => selectedClientsInGroup.includes(c.id))} field="whatsapp" />
+                  <CompareField label="Área de Atuação" clients={selectedGroup.clients.filter(c => selectedClientsInGroup.includes(c.id))} field="business_area" />
+                  <CompareField label="Observações" clients={selectedGroup.clients.filter(c => selectedClientsInGroup.includes(c.id))} field="notes" />
                 </CardContent>
               </Card>
 
