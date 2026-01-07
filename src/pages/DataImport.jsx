@@ -389,7 +389,7 @@ export default function DataImport() {
             client = await base44.entities.Client.create(clientData);
           }
 
-          // Se tem dados de certificado, criar também
+          // Se tem dados de certificado, verificar se já existe antes de criar
           if (hasCertificateData && (record.dt_emis || record.dt_fim)) {
             // Determinar tipo de certificado
             let certType = 'e_cpf_a3';
@@ -403,7 +403,6 @@ export default function DataImport() {
             // Formatar datas
             const formatDate = (dateStr) => {
               if (!dateStr) return null;
-              // Tentar formatos comuns: dd/mm/yyyy, yyyy-mm-dd
               const str = String(dateStr);
               if (str.includes('/')) {
                 const parts = str.split('/');
@@ -414,18 +413,30 @@ export default function DataImport() {
               return str;
             };
 
-            await base44.entities.Certificate.create({
-              client_id: client.id,
-              client_name: record.nome || 'Sem nome',
-              client_email: record.email || '',
-              client_phone: record.telefone || '',
-              certificate_type: certType,
-              issue_date: formatDate(record.dt_emis),
-              expiry_date: formatDate(record.dt_fim),
-              status: 'ativo',
-              renewal_status: 'pendente',
-              notes: record.unid_atendimento || '',
-            });
+            const expiryDate = formatDate(record.dt_fim);
+
+            // 🔍 VERIFICAR SE JÁ EXISTE CERTIFICADO IDÊNTICO
+            const existingCerts = await base44.entities.Certificate.filter({ client_id: client.id });
+            const duplicateCert = existingCerts.find(cert => 
+              cert.certificate_type === certType && 
+              cert.expiry_date === expiryDate
+            );
+
+            // CRIAR APENAS SE NÃO EXISTIR
+            if (!duplicateCert) {
+              await base44.entities.Certificate.create({
+                client_id: client.id,
+                client_name: record.nome || 'Sem nome',
+                client_email: record.email || '',
+                client_phone: record.telefone || '',
+                certificate_type: certType,
+                issue_date: formatDate(record.dt_emis),
+                expiry_date: expiryDate,
+                status: 'ativo',
+                renewal_status: 'pendente',
+                notes: record.unid_atendimento || '',
+              });
+            }
           }
         }));
         
