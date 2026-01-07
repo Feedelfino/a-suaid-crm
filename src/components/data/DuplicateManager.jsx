@@ -229,7 +229,11 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
     }
   };
 
-  const handleIgnoreGroup = (groupId) => {
+  const handleIgnoreGroup = (groupId, group) => {
+    // Adiciona todos os IDs do grupo aos clientes ignorados
+    group.clients.forEach(client => {
+      setIgnoredClients(prev => new Set([...prev, client.id]));
+    });
     setIgnoredGroups(prev => new Set([...prev, groupId]));
     if (selectedGroup?.id === groupId) {
       setSelectedGroup(null);
@@ -238,6 +242,15 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
 
   const handleIgnoreClient = (clientId) => {
     setIgnoredClients(prev => new Set([...prev, clientId]));
+    // Remove da seleção se estiver selecionado
+    setSelectedClientsInGroup(prev => prev.filter(id => id !== clientId));
+    // Se for o principal, seleciona outro
+    if (clientId === primaryClientId) {
+      const remaining = selectedClientsInGroup.filter(id => id !== clientId);
+      if (remaining.length > 0) {
+        setPrimaryClientId(remaining[0]);
+      }
+    }
   };
 
   const handleRestoreIgnored = () => {
@@ -307,7 +320,13 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
             </DialogTitle>
           </DialogHeader>
 
-          {duplicateGroups.length === 0 ? (
+          {duplicateGroups.filter((group, groupIdx) => {
+            if (ignoredGroups.has(`group-${groupIdx}`)) return false;
+            const hasActiveClients = group.clients.some(c => !ignoredClients.has(c.id));
+            if (!hasActiveClients) return false;
+            const activeCount = group.clients.filter(c => !ignoredClients.has(c.id)).length;
+            return activeCount >= 2;
+          }).length === 0 ? (
             <div className="text-center py-12">
               <CheckCircle2 className="w-16 h-16 mx-auto mb-4 text-green-500" />
               <p className="text-lg font-medium text-slate-700">Nenhum duplicado encontrado!</p>
@@ -315,7 +334,18 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
             </div>
           ) : (
             <div className="space-y-4">
-              {duplicateGroups.filter((group, idx) => !ignoredGroups.has(`group-${idx}`)).map((group, idx) => (
+              {duplicateGroups.filter((group, groupIdx) => {
+                // Filtra grupos que foram marcados como ignorados
+                if (ignoredGroups.has(`group-${groupIdx}`)) return false;
+                // Filtra grupos onde todos os clientes foram ignorados
+                const hasActiveClients = group.clients.some(c => !ignoredClients.has(c.id));
+                return hasActiveClients;
+              }).map((group, idx) => {
+                // Filtra apenas clientes ativos para exibição
+                const activeClients = group.clients.filter(c => !ignoredClients.has(c.id));
+                if (activeClients.length < 2) return null;
+                
+                return (
                 <Card key={idx} className="border-amber-200 bg-amber-50/50">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
@@ -337,9 +367,13 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                         <Button 
                           size="sm"
                           variant="outline"
-                          onClick={() => handleIgnoreGroup(`group-${idx}`)}
-                          className="text-slate-600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleIgnoreGroup(`group-${idx}`, group);
+                          }}
+                          className="text-slate-600 hover:bg-red-50 hover:text-red-600 hover:border-red-300"
                         >
+                          <X className="w-4 h-4 mr-1" />
                           Não é duplicado
                         </Button>
                         <Button 
@@ -355,7 +389,7 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {group.clients.map((client) => (
+                      {activeClients.map((client) => (
                         <div key={client.id} className="p-3 bg-white rounded-lg border border-slate-200">
                           <p className="font-medium text-slate-800 truncate">{client.client_name}</p>
                           {client.company_name && (
@@ -376,7 +410,8 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              }).filter(Boolean)}
             </div>
           )}
         </DialogContent>
