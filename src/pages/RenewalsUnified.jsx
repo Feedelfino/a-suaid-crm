@@ -63,24 +63,56 @@ export default function RenewalsUnified() {
 
   // CONSOLIDAÇÃO CRÍTICA: UM certificado por cliente_id (regra obrigatória)
   const consolidatedCertificates = React.useMemo(() => {
+    console.log('🔍 === DIAGNÓSTICO DE DUPLICAÇÃO ===');
+    console.log(`Total de certificados no banco: ${allCertificates.length}`);
+    
+    // Análise detalhada de duplicações
+    const clientIdCounts = {};
+    const certsWithoutClientId = [];
+    const certsWithClientId = [];
+    
+    allCertificates.forEach(cert => {
+      if (!cert.client_id || cert.client_id === '' || cert.client_id === null) {
+        certsWithoutClientId.push(cert);
+      } else {
+        certsWithClientId.push(cert);
+        clientIdCounts[cert.client_id] = (clientIdCounts[cert.client_id] || 0) + 1;
+      }
+    });
+    
+    console.log(`Certificados COM client_id: ${certsWithClientId.length}`);
+    console.log(`Certificados SEM client_id: ${certsWithoutClientId.length}`);
+    
+    // Detectar duplicações
+    const duplicatedClientIds = Object.entries(clientIdCounts)
+      .filter(([_, count]) => count > 1)
+      .sort((a, b) => b[1] - a[1]);
+    
+    if (duplicatedClientIds.length > 0) {
+      console.log(`⚠️ CLIENTES COM DUPLICAÇÃO: ${duplicatedClientIds.length}`);
+      console.log('Top 10 clientes com mais certificados:');
+      duplicatedClientIds.slice(0, 10).forEach(([clientId, count]) => {
+        const certs = certsWithClientId.filter(c => c.client_id === clientId);
+        console.log(`  Cliente ${clientId}: ${count} certificados`, certs.map(c => ({
+          type: c.certificate_type,
+          expiry: c.expiry_date,
+          status: c.renewal_status
+        })));
+      });
+    }
+    
+    // CONSOLIDAÇÃO: UM certificado por cliente
     const certsByClient = new Map();
     const today = new Date();
     
-    allCertificates.forEach(cert => {
-      // REGRA 1: Apenas certificados com client_id válido
-      if (!cert.client_id || cert.client_id === '' || cert.client_id === null) {
-        console.warn('Certificado sem client_id ignorado:', cert);
-        return;
-      }
-      
-      // REGRA 2: Ignorar certificados já vencidos E renovados (histórico)
+    certsWithClientId.forEach(cert => {
+      // REGRA 1: Ignorar certificados já vencidos E renovados (histórico)
       if (cert.status === 'vencido' && cert.renewal_status === 'renovado') {
         return;
       }
       
-      // REGRA 3: Verificar data de expiração
+      // REGRA 2: Verificar data de expiração
       if (!cert.expiry_date) {
-        console.warn('Certificado sem data de expiração ignorado:', cert);
         return;
       }
       
@@ -88,18 +120,14 @@ export default function RenewalsUnified() {
       const existing = certsByClient.get(cert.client_id);
       
       if (!existing) {
-        // Primeiro certificado deste cliente
         certsByClient.set(cert.client_id, cert);
       } else {
-        // Já existe certificado para este cliente - escolher o mais próximo do vencimento (FUTURO)
         const existingDate = parseISO(existing.expiry_date);
         const daysToExpiry = differenceInDays(expiryDate, today);
         const existingDaysToExpiry = differenceInDays(existingDate, today);
         
         // Prioridade 1: Certificados futuros sobre vencidos
-        // Prioridade 2: Entre futuros, o mais próximo do vencimento
         if (daysToExpiry >= 0 && existingDaysToExpiry < 0) {
-          // Novo é futuro, existente já venceu - substituir
           certsByClient.set(cert.client_id, cert);
         } else if (daysToExpiry >= 0 && existingDaysToExpiry >= 0) {
           // Ambos futuros - manter o mais próximo
@@ -107,17 +135,19 @@ export default function RenewalsUnified() {
             certsByClient.set(cert.client_id, cert);
           }
         } else if (daysToExpiry < 0 && existingDaysToExpiry < 0) {
-          // Ambos vencidos - manter o mais recente (menos vencido)
+          // Ambos vencidos - manter o mais recente
           if (daysToExpiry > existingDaysToExpiry) {
             certsByClient.set(cert.client_id, cert);
           }
         }
-        // Se novo é vencido e existente é futuro, manter existente (não fazer nada)
       }
     });
     
     const result = Array.from(certsByClient.values());
-    console.log(`📊 Consolidação: ${allCertificates.length} certificados → ${result.length} clientes únicos`);
+    console.log(`✅ RESULTADO CONSOLIDADO: ${result.length} clientes únicos`);
+    console.log(`Redução: ${allCertificates.length} → ${result.length} (${Math.round((1 - result.length/allCertificates.length) * 100)}% de duplicatas removidas)`);
+    console.log('🔍 === FIM DO DIAGNÓSTICO ===\n');
+    
     return result;
   }, [allCertificates]);
 
