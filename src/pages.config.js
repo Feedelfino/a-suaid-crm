@@ -7,6 +7,7 @@ import Campaigns from './pages/Campaigns';
 import Chat from './pages/Chat';
 import ClientDetails from './pages/ClientDetails';
 import ClientForm from './pages/ClientForm';
+import Clients from './pages/Clients';
 import Dashboard from './pages/Dashboard';
 import DataImport from './pages/DataImport';
 import HelpCenter from './pages/HelpCenter';
@@ -14,14 +15,13 @@ import Home from './pages/Home';
 import Interactions from './pages/Interactions';
 import MigrationControl from './pages/MigrationControl';
 import Notes from './pages/Notes';
+import Renewals from './pages/Renewals';
+import RenewalsDashboard from './pages/RenewalsDashboard';
+import RenewalsUnified from './pages/RenewalsUnified';
 import Reports from './pages/Reports';
 import SalesPipeline from './pages/SalesPipeline';
 import Schedule from './pages/Schedule';
 import Tasks from './pages/Tasks';
-import Clients from './pages/Clients';
-import Renewals from './pages/Renewals';
-import RenewalsDashboard from './pages/RenewalsDashboard';
-import RenewalsUnified from './pages/RenewalsUnified';
 import __Layout from './Layout.jsx';
 
 
@@ -35,6 +35,7 @@ export const PAGES = {
     "Chat": Chat,
     "ClientDetails": ClientDetails,
     "ClientForm": ClientForm,
+    "Clients": Clients,
     "Dashboard": Dashboard,
     "DataImport": DataImport,
     "HelpCenter": HelpCenter,
@@ -42,14 +43,13 @@ export const PAGES = {
     "Interactions": Interactions,
     "MigrationControl": MigrationControl,
     "Notes": Notes,
+    "Renewals": Renewals,
+    "RenewalsDashboard": RenewalsDashboard,
+    "RenewalsUnified": RenewalsUnified,
     "Reports": Reports,
     "SalesPipeline": SalesPipeline,
     "Schedule": Schedule,
     "Tasks": Tasks,
-    "Clients": Clients,
-    "Renewals": Renewals,
-    "RenewalsDashboard": RenewalsDashboard,
-    "RenewalsUnified": RenewalsUnified,
 }
 
 export const pagesConfig = {

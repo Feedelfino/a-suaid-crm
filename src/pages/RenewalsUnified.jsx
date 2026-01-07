@@ -55,16 +55,18 @@ export default function RenewalsUnified() {
 
   // Buscar todos os certificados (fonte única de verdade)
   const { data: allCertificates = [], isLoading } = useQuery({
-    queryKey: ['certificates-unified'],
+    queryKey: ['certificates'],
     queryFn: () => base44.entities.Certificate.list('-expiry_date'),
-    staleTime: 10000,
+    refetchInterval: 5000,
+    staleTime: 0,
   });
 
   // Buscar clientes de renovação vinculados
   const { data: renewalClients = [] } = useQuery({
-    queryKey: ['renewal-clients'],
+    queryKey: ['clients'],
     queryFn: () => base44.entities.Client.filter({ lead_source: 'renovacao' }),
-    staleTime: 10000,
+    refetchInterval: 5000,
+    staleTime: 0,
   });
 
   // Mutation para atualizar status
@@ -72,8 +74,8 @@ export default function RenewalsUnified() {
     mutationFn: ({ certId, status }) => 
       base44.entities.Certificate.update(certId, { renewal_status: status }),
     onSuccess: () => {
-      queryClient.invalidateQueries(['certificates-unified']);
-      queryClient.invalidateQueries(['renewal-clients']);
+      queryClient.invalidateQueries(['certificates']);
+      queryClient.invalidateQueries(['clients']);
     },
   });
 
@@ -148,31 +150,38 @@ export default function RenewalsUnified() {
             });
           }
 
-          // Verificar se já existe certificado para este cliente
-          const existingCerts = await base44.entities.Certificate.filter({ client_id: client.id });
-          
-          if (existingCerts.length === 0) {
-            // Criar apenas se não existir
-            let certType = 'e_cpf_a3';
-            const produto = String(record.produto || '').toLowerCase();
-            if (produto.includes('cnpj')) {
-              certType = produto.includes('a1') ? 'e_cnpj_a1' : 'e_cnpj_a3';
-            } else if (produto.includes('cpf')) {
-              certType = produto.includes('a1') ? 'e_cpf_a1' : 'e_cpf_a3';
-            }
+          // Determinar tipo de certificado
+          let certType = 'e_cpf_a3';
+          const produto = String(record.produto || '').toLowerCase();
+          if (produto.includes('cnpj')) {
+            certType = produto.includes('a1') ? 'e_cnpj_a1' : 'e_cnpj_a3';
+          } else if (produto.includes('cpf')) {
+            certType = produto.includes('a1') ? 'e_cpf_a1' : 'e_cpf_a3';
+          }
 
-            const formatDate = (dateStr) => {
-              if (!dateStr) return null;
-              const str = String(dateStr);
-              if (str.includes('/')) {
-                const parts = str.split('/');
-                if (parts.length === 3) {
-                  return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-                }
+          const formatDate = (dateStr) => {
+            if (!dateStr) return null;
+            const str = String(dateStr);
+            if (str.includes('/')) {
+              const parts = str.split('/');
+              if (parts.length === 3) {
+                return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
               }
-              return str;
-            };
+            }
+            return str;
+          };
 
+          const expiryDate = formatDate(record.dt_fim);
+
+          // Verificar se já existe certificado IDÊNTICO (mesmo cliente, tipo e data de vencimento)
+          const existingCerts = await base44.entities.Certificate.filter({ client_id: client.id });
+          const duplicateCert = existingCerts.find(cert => 
+            cert.certificate_type === certType && 
+            cert.expiry_date === expiryDate
+          );
+          
+          if (!duplicateCert) {
+            // Criar apenas se não existir duplicado
             await base44.entities.Certificate.create({
               client_id: client.id,
               client_name: record.nome || 'Sem nome',
@@ -180,17 +189,17 @@ export default function RenewalsUnified() {
               client_phone: record.telefone || '',
               certificate_type: certType,
               issue_date: formatDate(record.dt_emis),
-              expiry_date: formatDate(record.dt_fim),
+              expiry_date: expiryDate,
               status: 'ativo',
               renewal_status: 'pendente',
             });
           }
         }
 
-        queryClient.invalidateQueries(['certificates-unified']);
-        queryClient.invalidateQueries(['renewal-clients']);
+        queryClient.invalidateQueries(['certificates']);
+        queryClient.invalidateQueries(['clients']);
         setUploadDialogOpen(false);
-        alert(`Importação concluída! ${dataArray.length} registro(s) processado(s).`);
+        alert(`Importação concluída! ${dataArray.length} registro(s) processado(s), duplicados ignorados.`);
       }
     } catch (error) {
       console.error('Erro ao importar:', error);
