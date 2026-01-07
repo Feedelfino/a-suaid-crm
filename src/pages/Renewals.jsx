@@ -1,19 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format, parseISO, differenceInDays, addDays } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { format, parseISO, differenceInDays } from 'date-fns';
 import { 
-  Upload, AlertTriangle, Clock, CheckCircle, 
-  Phone, Mail, User, FileText, Filter, Search
+  RefreshCw, AlertCircle, Clock, TrendingUp, Search, Filter, Eye, Phone, Mail,
+  CheckCircle2, XCircle, Users, Calendar, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -29,303 +27,590 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-
-const CERTIFICATE_TYPES = {
-  e_cpf_a1: 'e-CPF A1',
-  e_cpf_a3: 'e-CPF A3',
-  e_cnpj_a1: 'e-CNPJ A1',
-  e_cnpj_a3: 'e-CNPJ A3',
-};
 
 export default function Renewals() {
   const queryClient = useQueryClient();
-  const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFilters, setDateFilters] = useState([]); // Múltiplos filtros de data
   const [typeFilter, setTypeFilter] = useState('all');
-  const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [agentFilter, setAgentFilter] = useState('all');
+  const [sortField, setSortField] = useState('expiry_date');
+  const [sortOrder, setSortOrder] = useState('asc');
 
-  useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const userData = await base44.auth.me();
-        setUser(userData);
-      } catch (e) {}
-    };
-    loadUser();
-  }, []);
-
-  const { data: certificates = [], isLoading } = useQuery({
+  // Buscar certificados do banco (fonte única)
+  const { data: allCertificates = [], isLoading } = useQuery({
     queryKey: ['certificates'],
-    queryFn: () => base44.entities.Certificate.list('-expiry_date', 1000),
+    queryFn: () => base44.entities.Certificate.list('-expiry_date'),
+    staleTime: 10000,
   });
 
-  const updateCertificate = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Certificate.update(id, data),
-    onSuccess: () => queryClient.invalidateQueries(['certificates']),
+  // Buscar clientes para enriquecer dados
+  const { data: allClients = [] } = useQuery({
+    queryKey: ['clients'],
+    queryFn: () => base44.entities.Client.list(),
+    staleTime: 10000,
   });
 
-  const today = new Date();
+  // 🎯 CONSOLIDAÇÃO: UM CERTIFICADO POR CLIENTE (regra obrigatória)
+  const renewalsActive = useMemo(() => {
+    const today = new Date();
+    const certsByClient = new Map();
 
-  // Filtrar certificados
-  const filteredCerts = certificates.filter(cert => {
-    const matchesSearch = !searchTerm || 
-      cert.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cert.client_email?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = typeFilter === 'all' || cert.certificate_type === typeFilter;
-    return matchesSearch && matchesType;
-  });
+    allCertificates.forEach(cert => {
+      // Ignorar certificados sem client_id válido
+      if (!cert.client_id) return;
 
-  // Classificar por categoria de vencimento
-  const expiredCerts = filteredCerts.filter(cert => {
-    if (!cert.expiry_date) return false;
-    const expiry = parseISO(cert.expiry_date);
-    const daysUntil = differenceInDays(expiry, today);
-    return daysUntil < -45;
-  });
+      // Ignorar certificados já renovados (histórico)
+      if (cert.renewal_status === 'renovado') return;
 
-  const recentlyExpired = filteredCerts.filter(cert => {
-    if (!cert.expiry_date) return false;
-    const expiry = parseISO(cert.expiry_date);
-    const daysUntil = differenceInDays(expiry, today);
-    return daysUntil >= -45 && daysUntil < 0;
-  });
+      // Ignorar certificados sem data de expiração
+      if (!cert.expiry_date) return;
 
-  const expiringIn45Days = filteredCerts.filter(cert => {
-    if (!cert.expiry_date) return false;
-    const expiry = parseISO(cert.expiry_date);
-    const daysUntil = differenceInDays(expiry, today);
-    return daysUntil >= 0 && daysUntil <= 45;
-  });
+      const expiryDate = parseISO(cert.expiry_date);
+      const existing = certsByClient.get(cert.client_id);
 
-  // Upload de planilha (mesmos critérios do Banco de Dados)
-  const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadStatus({ type: 'loading', message: 'Processando arquivo...' });
-
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      
-      const result = await base44.integrations.Core.ExtractDataFromUploadedFile({
-        file_url,
-        json_schema: {
-          type: "object",
-          properties: {
-            registros: {
-              type: "array",
-              description: "Lista de registros extraídos do arquivo",
-              items: {
-                type: "object",
-                properties: {
-                  produto: { type: "string", description: "PRODUTO, tipo de certificado digital" },
-                  cnpj: { type: "string", description: "CNPJ da empresa" },
-                  cpf: { type: "string", description: "CPF do titular" },
-                  nome: { type: "string", description: "NOME DO TITULAR, nome completo" },
-                  telefone: { type: "string", description: "TELEFONE, celular" },
-                  email: { type: "string", description: "EMAIL, e-mail" },
-                  unid_atendimento: { type: "string", description: "UNID_ATENDIMENTO, local de atendimento" },
-                  dt_emis: { type: "string", description: "DT_EMIS, data de emissão" },
-                  dt_fim: { type: "string", description: "DT_FIM, data de vencimento" },
-                }
-              }
-            }
-          }
-        }
-      });
-
-      if (result.status === 'success' && result.output) {
-        const rawData = result.output.registros || result.output;
-        const records = Array.isArray(rawData) ? rawData : [rawData];
-        let imported = 0;
-
-        // Buscar ou criar campanha de renovação
-        const campaigns = await base44.entities.Campaign.filter({ name: 'Renovação de Certificados' });
-        let renovationCampaign;
-        if (campaigns.length === 0) {
-          renovationCampaign = await base44.entities.Campaign.create({
-            name: 'Renovação de Certificados',
-            description: 'Campanha automática para renovação de certificados digitais',
-            status: 'ativa',
-            start_date: new Date().toISOString().split('T')[0],
-          });
-        } else {
-          renovationCampaign = campaigns[0];
-        }
-
-        // Buscar clientes existentes
-        const existingClients = await base44.entities.Client.list('-created_date', 2000);
-
-        for (const record of records) {
-          try {
-            const cpf = String(record.cpf || '').replace(/\D/g, '');
-            const cnpj = String(record.cnpj || '').replace(/\D/g, '');
-            
-            // Verificar se cliente já existe por CPF ou CNPJ
-            let client = existingClients.find(c => {
-              const cCpf = String(c.cpf || '').replace(/\D/g, '');
-              const cCnpj = String(c.cnpj || '').replace(/\D/g, '');
-              if (cpf && cCpf && cpf === cCpf) return true;
-              if (cnpj && cCnpj && cnpj === cCnpj) return true;
-              return false;
-            });
-
-            // Criar ou atualizar cliente no Cadastro Central
-            const clientData = {
-              client_name: record.nome || 'Sem nome',
-              cpf: cpf || '',
-              cnpj: cnpj || '',
-              email: record.email || '',
-              phone: record.telefone || '',
-              whatsapp: record.telefone || '',
-              business_area: record.produto || '',
-              lead_status: 'qualificado',
-              lead_source: 'renovacao',
-              funnel_stage: 'contato',
-              campaign_id: renovationCampaign.id,
-              notes: `Renovação automática - ${record.unid_atendimento || ''}`,
-            };
-
-            if (client) {
-              // Atualizar cliente existente
-              await base44.entities.Client.update(client.id, clientData);
-            } else {
-              // Criar novo cliente
-              client = await base44.entities.Client.create(clientData);
-            }
-
-            // Determinar tipo de certificado
-            let certType = 'e_cpf_a3';
-            const produto = String(record.produto || '').toLowerCase();
-            if (produto.includes('cnpj')) {
-              certType = produto.includes('a1') ? 'e_cnpj_a1' : 'e_cnpj_a3';
-            } else if (produto.includes('cpf')) {
-              certType = produto.includes('a1') ? 'e_cpf_a1' : 'e_cpf_a3';
-            }
-
-            // Formatar datas
-            const formatDate = (dateStr) => {
-              if (!dateStr) return null;
-              const str = String(dateStr);
-              if (str.includes('/')) {
-                const parts = str.split('/');
-                if (parts.length === 3) {
-                  return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-                }
-              }
-              return str;
-            };
-
-            // Criar registro de certificado
-            await base44.entities.Certificate.create({
-              client_id: client.id,
-              client_name: record.nome || 'Sem nome',
-              client_email: record.email || '',
-              client_phone: record.telefone || '',
-              certificate_type: certType,
-              issue_date: formatDate(record.dt_emis),
-              expiry_date: formatDate(record.dt_fim),
-              status: 'ativo',
-              renewal_status: 'pendente',
-              notes: record.unid_atendimento || '',
-            });
-
-            imported++;
-          } catch (err) {
-            console.error('Erro ao importar registro:', err);
-          }
-        }
-
-        setUploadStatus({ 
-          type: 'success', 
-          message: `${imported} certificados importados, clientes cadastrados e inseridos no funil!` 
-        });
-        queryClient.invalidateQueries(['certificates']);
-        queryClient.invalidateQueries(['clients']);
+      if (!existing) {
+        certsByClient.set(cert.client_id, cert);
       } else {
-        setUploadStatus({ type: 'error', message: result.details || 'Erro ao processar arquivo' });
+        // Já existe certificado para este cliente
+        // Prioridade: certificado mais próximo do vencimento (não renovado)
+        const existingDate = parseISO(existing.expiry_date);
+        const daysToExpiry = differenceInDays(expiryDate, today);
+        const existingDaysToExpiry = differenceInDays(existingDate, today);
+
+        // Preferir certificados futuros sobre vencidos
+        if (daysToExpiry >= 0 && existingDaysToExpiry < 0) {
+          certsByClient.set(cert.client_id, cert);
+        } else if (daysToExpiry >= 0 && existingDaysToExpiry >= 0) {
+          // Ambos futuros: manter o mais próximo
+          if (daysToExpiry < existingDaysToExpiry) {
+            certsByClient.set(cert.client_id, cert);
+          }
+        } else if (daysToExpiry < 0 && existingDaysToExpiry < 0) {
+          // Ambos vencidos: manter o mais recente
+          if (daysToExpiry > existingDaysToExpiry) {
+            certsByClient.set(cert.client_id, cert);
+          }
+        }
       }
-    } catch (error) {
-      setUploadStatus({ type: 'error', message: 'Erro ao fazer upload do arquivo' });
+    });
+
+    // Enriquecer com dados do cliente
+    const enrichedRenewals = Array.from(certsByClient.values()).map(cert => {
+      const client = allClients.find(c => c.id === cert.client_id);
+      return {
+        ...cert,
+        client_data: client || {}
+      };
+    });
+
+    return enrichedRenewals;
+  }, [allCertificates, allClients]);
+
+  // 📊 DASHBOARD ESTRATÉGICO (baseado em data de expiração)
+  const dashboard = useMemo(() => {
+    const today = new Date();
+    
+    const expired = renewalsActive.filter(r => {
+      const days = differenceInDays(parseISO(r.expiry_date), today);
+      return days < 0;
+    });
+
+    const days30 = renewalsActive.filter(r => {
+      const days = differenceInDays(parseISO(r.expiry_date), today);
+      return days >= 0 && days <= 30;
+    });
+
+    const days60 = renewalsActive.filter(r => {
+      const days = differenceInDays(parseISO(r.expiry_date), today);
+      return days > 30 && days <= 60;
+    });
+
+    const days90 = renewalsActive.filter(r => {
+      const days = differenceInDays(parseISO(r.expiry_date), today);
+      return days > 60 && days <= 90;
+    });
+
+    const above90 = renewalsActive.filter(r => {
+      const days = differenceInDays(parseISO(r.expiry_date), today);
+      return days > 90;
+    });
+
+    const inContact = renewalsActive.filter(r => r.renewal_status === 'em_contato');
+    const renewed = renewalsActive.filter(r => r.renewal_status === 'renovado');
+    const conversionRate = renewalsActive.length > 0 
+      ? ((renewed.length / renewalsActive.length) * 100).toFixed(1) 
+      : '0.0';
+
+    return {
+      total: renewalsActive.length,
+      expired: expired.length,
+      days30: days30.length,
+      days60: days60.length,
+      days90: days90.length,
+      above90: above90.length,
+      inContact: inContact.length,
+      renewed: renewed.length,
+      conversionRate
+    };
+  }, [renewalsActive]);
+
+  // 🔎 FILTROS APLICADOS
+  const filteredRenewals = useMemo(() => {
+    const today = new Date();
+    
+    let filtered = renewalsActive.filter(renewal => {
+      // Busca por texto
+      const matchesSearch = !searchTerm || 
+        renewal.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        renewal.client_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        renewal.client_phone?.includes(searchTerm) ||
+        renewal.client_data?.company_name?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Filtro de tipo de certificado
+      const matchesType = typeFilter === 'all' || renewal.certificate_type === typeFilter;
+
+      // Filtro de status
+      const matchesStatus = statusFilter === 'all' || renewal.renewal_status === statusFilter;
+
+      // Filtro de agente
+      const matchesAgent = agentFilter === 'all' || renewal.assigned_agent === agentFilter;
+
+      // Filtros de data (combináveis - usar o maior intervalo)
+      let matchesDate = true;
+      if (dateFilters.length > 0) {
+        const days = differenceInDays(parseISO(renewal.expiry_date), today);
+        
+        // Determinar o maior intervalo selecionado
+        const maxDays = Math.max(...dateFilters.map(f => {
+          if (f === 'expired') return -1;
+          if (f === '30') return 30;
+          if (f === '45') return 45;
+          if (f === '60') return 60;
+          if (f === '75') return 75;
+          if (f === '90') return 90;
+          return 0;
+        }));
+
+        if (dateFilters.includes('expired') && maxDays === -1) {
+          // Apenas vencidos
+          matchesDate = days < 0;
+        } else if (dateFilters.includes('expired')) {
+          // Vencidos + outros intervalos
+          matchesDate = days < 0 || (days >= 0 && days <= maxDays);
+        } else {
+          // Apenas intervalos futuros
+          matchesDate = days >= 0 && days <= maxDays;
+        }
+      }
+
+      return matchesSearch && matchesType && matchesStatus && matchesAgent && matchesDate;
+    });
+
+    // Ordenação
+    filtered.sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+      
+      if (sortField === 'expiry_date') {
+        aVal = aVal ? parseISO(aVal).getTime() : 0;
+        bVal = bVal ? parseISO(bVal).getTime() : 0;
+      }
+      
+      if (sortOrder === 'asc') {
+        return aVal > bVal ? 1 : -1;
+      } else {
+        return aVal < bVal ? 1 : -1;
+      }
+    });
+
+    return filtered;
+  }, [renewalsActive, searchTerm, dateFilters, typeFilter, statusFilter, agentFilter, sortField, sortOrder]);
+
+  // Lista única de agentes
+  const agents = useMemo(() => {
+    const uniqueAgents = new Set(renewalsActive.map(r => r.assigned_agent).filter(Boolean));
+    return Array.from(uniqueAgents);
+  }, [renewalsActive]);
+
+  // Mutation para atualizar status
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ certId, status }) => 
+      base44.entities.Certificate.update(certId, { renewal_status: status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['certificates']);
+    },
+  });
+
+  // Handlers
+  const toggleDateFilter = (filter) => {
+    setDateFilters(prev => 
+      prev.includes(filter) 
+        ? prev.filter(f => f !== filter)
+        : [...prev, filter]
+    );
+  };
+
+  const handleCardClick = (filter) => {
+    setDateFilters([filter]);
+  };
+
+  const toggleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
     }
   };
 
-  const CertificateTable = ({ data, title, icon: Icon, color }) => (
-    <Card className="border-0 shadow-lg">
-      <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <div className={`w-8 h-8 rounded-lg ${color} flex items-center justify-center`}>
-            <Icon className="w-4 h-4 text-white" />
-          </div>
-          <CardTitle className="text-lg">{title}</CardTitle>
-          <Badge variant="secondary">{data.length}</Badge>
+  const getDaysRemaining = (expiryDate) => {
+    if (!expiryDate) return null;
+    return differenceInDays(parseISO(expiryDate), new Date());
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      pendente: 'bg-slate-100 text-slate-700',
+      em_contato: 'bg-blue-100 text-blue-700',
+      renovado: 'bg-green-100 text-green-700',
+      nao_renovado: 'bg-red-100 text-red-700',
+    };
+    return colors[status] || 'bg-slate-100 text-slate-700';
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin w-8 h-8 border-4 border-[#6B2D8B] border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Renovações</h1>
+          <p className="text-slate-500">
+            Gestão estratégica de certificados • {dashboard.total} clientes únicos
+          </p>
         </div>
-      </CardHeader>
-      <CardContent>
-        {data.length === 0 ? (
-          <p className="text-center py-8 text-slate-500">Nenhum certificado nesta categoria</p>
-        ) : (
+      </div>
+
+      {/* 📊 DASHBOARD COMERCIAL - Cards Clicáveis */}
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
+        <Card 
+          className="border-0 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => handleCardClick('expired')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              <div>
+                <p className="text-xs text-slate-500">Vencidos</p>
+                <p className="text-2xl font-bold text-slate-800">{dashboard.expired}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="border-0 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => handleCardClick('30')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Clock className="w-5 h-5 text-orange-600" />
+              <div>
+                <p className="text-xs text-slate-500">Até 30d</p>
+                <p className="text-2xl font-bold text-slate-800">{dashboard.days30}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="border-0 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => handleCardClick('60')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Clock className="w-5 h-5 text-amber-600" />
+              <div>
+                <p className="text-xs text-slate-500">31-60d</p>
+                <p className="text-2xl font-bold text-slate-800">{dashboard.days60}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card 
+          className="border-0 shadow-md cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => handleCardClick('90')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Clock className="w-5 h-5 text-blue-600" />
+              <div>
+                <p className="text-xs text-slate-500">61-90d</p>
+                <p className="text-2xl font-bold text-slate-800">{dashboard.days90}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Calendar className="w-5 h-5 text-slate-400" />
+              <div>
+                <p className="text-xs text-slate-500">&gt;90d</p>
+                <p className="text-2xl font-bold text-slate-800">{dashboard.above90}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <RefreshCw className="w-5 h-5 text-blue-600" />
+              <div>
+                <p className="text-xs text-slate-500">Em Contato</p>
+                <p className="text-2xl font-bold text-slate-800">{dashboard.inContact}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <TrendingUp className="w-5 h-5 text-[#6B2D8B]" />
+              <div>
+                <p className="text-xs text-slate-500">Conversão</p>
+                <p className="text-2xl font-bold text-slate-800">{dashboard.conversionRate}%</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 🔎 FILTROS ESTRATÉGICOS */}
+      <Card className="border-0 shadow-lg">
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            {/* Linha 1: Busca + Filtros de Data */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Input
+                  placeholder="Buscar cliente, empresa, e-mail ou telefone..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
+              <div className="flex gap-2 flex-wrap">
+                <span className="text-sm text-slate-500 flex items-center gap-2">
+                  <Filter className="w-4 h-4" />
+                  Período:
+                </span>
+                {[
+                  { value: 'expired', label: 'Vencidos', color: 'bg-red-100 text-red-700' },
+                  { value: '30', label: '30d', color: 'bg-orange-100 text-orange-700' },
+                  { value: '45', label: '45d', color: 'bg-amber-100 text-amber-700' },
+                  { value: '60', label: '60d', color: 'bg-yellow-100 text-yellow-700' },
+                  { value: '75', label: '75d', color: 'bg-blue-100 text-blue-700' },
+                  { value: '90', label: '90d', color: 'bg-indigo-100 text-indigo-700' },
+                ].map(filter => (
+                  <Badge
+                    key={filter.value}
+                    className={`cursor-pointer ${
+                      dateFilters.includes(filter.value) 
+                        ? filter.color + ' border-2 border-current' 
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                    onClick={() => toggleDateFilter(filter.value)}
+                  >
+                    {filter.label}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            {/* Linha 2: Outros Filtros */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tipo de Certificado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Tipos</SelectItem>
+                  <SelectItem value="e_cpf_a1">e-CPF A1</SelectItem>
+                  <SelectItem value="e_cpf_a3">e-CPF A3</SelectItem>
+                  <SelectItem value="e_cnpj_a1">e-CNPJ A1</SelectItem>
+                  <SelectItem value="e_cnpj_a3">e-CNPJ A3</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Status</SelectItem>
+                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="em_contato">Em Contato</SelectItem>
+                  <SelectItem value="renovado">Renovado</SelectItem>
+                  <SelectItem value="nao_renovado">Não Renovado</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={agentFilter} onValueChange={setAgentFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Agentes</SelectItem>
+                  {agents.map(agent => (
+                    <SelectItem key={agent} value={agent}>{agent}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSearchTerm('');
+                  setDateFilters([]);
+                  setTypeFilter('all');
+                  setStatusFilter('all');
+                  setAgentFilter('all');
+                }}
+              >
+                Limpar Filtros
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 📋 LISTA DE RENOVAÇÕES */}
+      <Card className="border-0 shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center justify-between">
+            <span>Certificados para Renovação ({filteredRenewals.length})</span>
+            <Badge variant="secondary" className="bg-green-100 text-green-700">
+              ✓ Sem Duplicatas
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Vencimento</TableHead>
-                  <TableHead>Status Renovação</TableHead>
-                  <TableHead>Ações</TableHead>
+                <TableRow className="bg-slate-50">
+                  <TableHead 
+                    className="font-semibold cursor-pointer"
+                    onClick={() => toggleSort('client_name')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Cliente
+                      {sortField === 'client_name' && (
+                        sortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                      )}
+                    </div>
+                  </TableHead>
+                  <TableHead className="font-semibold">Tipo</TableHead>
+                  <TableHead 
+                    className="font-semibold cursor-pointer"
+                    onClick={() => toggleSort('expiry_date')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Vencimento
+                      {sortField === 'expiry_date' && (
+                        sortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                      )}
+                    </div>
+                  </TableHead>
+                  <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="font-semibold">Responsável</TableHead>
+                  <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.map(cert => {
-                  const daysUntil = cert.expiry_date 
-                    ? differenceInDays(parseISO(cert.expiry_date), today)
-                    : 0;
-                  
+                {filteredRenewals.map((renewal) => {
+                  const daysRemaining = getDaysRemaining(renewal.expiry_date);
+                  const isExpired = daysRemaining !== null && daysRemaining < 0;
+                  const isUrgent = daysRemaining !== null && daysRemaining <= 7 && daysRemaining >= 0;
+
                   return (
-                    <TableRow key={cert.id}>
+                    <TableRow key={renewal.id} className="hover:bg-slate-50">
                       <TableCell>
-                        <div>
-                          <p className="font-medium">{cert.client_name}</p>
-                          {cert.client_email && (
-                            <p className="text-xs text-slate-500">{cert.client_email}</p>
-                          )}
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#6B2D8B] to-[#8B4DAB] flex items-center justify-center text-white font-bold text-sm">
+                            {renewal.client_name?.charAt(0) || 'C'}
+                          </div>
+                          <div>
+                            <Link 
+                              to={createPageUrl(`ClientDetails?id=${renewal.client_id}`)}
+                              className="font-medium text-slate-800 hover:text-[#6B2D8B] hover:underline"
+                            >
+                              {renewal.client_name}
+                            </Link>
+                            {renewal.client_data?.company_name && (
+                              <p className="text-xs text-slate-500">{renewal.client_data.company_name}</p>
+                            )}
+                            <div className="flex items-center gap-2 mt-1">
+                              {renewal.client_phone && (
+                                <span className="text-xs text-slate-500 flex items-center gap-1">
+                                  <Phone className="w-3 h-3" /> {renewal.client_phone}
+                                </span>
+                              )}
+                              {renewal.client_email && (
+                                <span className="text-xs text-slate-500 flex items-center gap-1">
+                                  <Mail className="w-3 h-3" /> {renewal.client_email}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {CERTIFICATE_TYPES[cert.certificate_type] || cert.certificate_type}
+                          {renewal.certificate_type?.replace('_', '-').toUpperCase()}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p>{cert.expiry_date && format(parseISO(cert.expiry_date), 'dd/MM/yyyy')}</p>
-                          <p className={`text-xs ${
-                            daysUntil < 0 ? 'text-red-500' : 
-                            daysUntil <= 15 ? 'text-orange-500' : 
-                            'text-amber-500'
-                          }`}>
-                            {daysUntil < 0 
-                              ? `Vencido há ${Math.abs(daysUntil)} dias`
-                              : `Vence em ${daysUntil} dias`
-                            }
+                          <p className="text-sm text-slate-800">
+                            {renewal.expiry_date ? format(parseISO(renewal.expiry_date), 'dd/MM/yyyy') : '-'}
                           </p>
+                          {daysRemaining !== null && (
+                            <p className={`text-xs font-medium ${
+                              isExpired ? 'text-red-600' :
+                              isUrgent ? 'text-orange-600' :
+                              daysRemaining <= 30 ? 'text-amber-600' :
+                              'text-slate-500'
+                            }`}>
+                              {isExpired ? `Vencido há ${Math.abs(daysRemaining)} dias` :
+                               daysRemaining === 0 ? 'Vence hoje!' :
+                               `Vence em ${daysRemaining} dias`}
+                            </p>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
                         <Select
-                          value={cert.renewal_status || 'pendente'}
-                          onValueChange={(v) => updateCertificate.mutate({ id: cert.id, data: { renewal_status: v } })}
+                          value={renewal.renewal_status || 'pendente'}
+                          onValueChange={(value) => updateStatusMutation.mutate({ certId: renewal.id, status: value })}
                         >
-                          <SelectTrigger className="w-32">
+                          <SelectTrigger className={`w-36 ${getStatusColor(renewal.renewal_status)}`}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -337,230 +622,30 @@ export default function Renewals() {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-2">
-                          {cert.client_phone && (
-                            <a href={`https://wa.me/55${cert.client_phone.replace(/\D/g, '')}`} target="_blank">
-                              <Button size="icon" variant="ghost" className="h-8 w-8">
-                                <Phone className="w-4 h-4 text-green-600" />
-                              </Button>
-                            </a>
-                          )}
-                          {cert.client_email && (
-                            <a href={`mailto:${cert.client_email}`}>
-                              <Button size="icon" variant="ghost" className="h-8 w-8">
-                                <Mail className="w-4 h-4 text-blue-600" />
-                              </Button>
-                            </a>
-                          )}
-                        </div>
+                        <span className="text-sm text-slate-600">{renewal.assigned_agent || '-'}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Link to={createPageUrl(`ClientDetails?id=${renewal.client_id}`)}>
+                          <Button variant="ghost" size="icon">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </Link>
                       </TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Renovações</h1>
-          <p className="text-slate-500">Gestão de renovação de certificados digitais</p>
-        </div>
-        <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]">
-              <Upload className="w-4 h-4 mr-2" />
-              Importar Planilha
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Importar Certificados para Renovação</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600">
-                Faça upload de uma planilha (CSV, Excel ou PDF) seguindo as <strong>mesmas especificações do Banco de Dados</strong>:
-              </p>
-              
-              <div className="p-3 bg-slate-50 rounded-lg">
-                <p className="text-sm font-semibold text-slate-700 mb-2">Colunas necessárias na primeira linha:</p>
-                <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
-                  <div className="flex items-center gap-1">
-                    <Badge variant="outline" className="text-xs">PRODUTO</Badge>
-                    <span>- Tipo de certificado</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Badge variant="outline" className="text-xs">CNPJ</Badge>
-                    <span>- Documento empresa</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Badge variant="outline" className="text-xs">CPF</Badge>
-                    <span>- Documento titular</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Badge className="text-xs bg-[#6B2D8B]">NOME</Badge>
-                    <span>- Nome titular *</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Badge variant="outline" className="text-xs">TELEFONE</Badge>
-                    <span>- Contato</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Badge variant="outline" className="text-xs">EMAIL</Badge>
-                    <span>- E-mail</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Badge variant="outline" className="text-xs">DT_EMIS</Badge>
-                    <span>- Data emissão</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Badge variant="outline" className="text-xs">DT_FIM</Badge>
-                    <span>- Data vencimento</span>
-                  </div>
-                </div>
+            {filteredRenewals.length === 0 && (
+              <div className="text-center py-16">
+                <Users className="w-16 h-16 mx-auto mb-4 text-slate-300" />
+                <p className="text-slate-500">Nenhum certificado encontrado com os filtros aplicados</p>
               </div>
-
-              <div className="text-xs text-slate-500 space-y-1">
-                <p>✓ Formatos: CSV, Excel (.xlsx, .xls) ou PDF</p>
-                <p>✓ Tamanho máximo: 15MB</p>
-                <p>✓ Datas no formato: dd/mm/aaaa</p>
-                <p>✓ Primeira linha deve conter os cabeçalhos</p>
-              </div>
-
-              <Input
-                type="file"
-                accept=".csv,.xlsx,.xls,.pdf"
-                onChange={handleFileUpload}
-              />
-              {uploadStatus && (
-                <div className={`p-3 rounded-lg ${
-                  uploadStatus.type === 'loading' ? 'bg-blue-50 text-blue-700' :
-                  uploadStatus.type === 'success' ? 'bg-green-50 text-green-700' :
-                  'bg-red-50 text-red-700'
-                }`}>
-                  {uploadStatus.message}
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-red-500 to-red-600 text-white">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-red-100">Vencidos há +45 dias</p>
-                <p className="text-3xl font-bold">{expiredCerts.length}</p>
-              </div>
-              <AlertTriangle className="w-12 h-12 text-red-200" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-orange-500 to-amber-500 text-white">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-orange-100">Vencidos recentemente</p>
-                <p className="text-3xl font-bold">{recentlyExpired.length}</p>
-              </div>
-              <Clock className="w-12 h-12 text-orange-200" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-amber-400 to-yellow-500 text-white">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-amber-100">Vence em 45 dias</p>
-                <p className="text-3xl font-bold">{expiringIn45Days.length}</p>
-              </div>
-              <FileText className="w-12 h-12 text-amber-200" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <Card className="border-0 shadow-lg">
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                placeholder="Buscar por nome ou e-mail..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os tipos</SelectItem>
-                {Object.entries(CERTIFICATE_TYPES).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            )}
           </div>
         </CardContent>
       </Card>
-
-      {/* Tables */}
-      <Tabs defaultValue="expiring" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="expiring">
-            Vence em 45 dias ({expiringIn45Days.length})
-          </TabsTrigger>
-          <TabsTrigger value="recent">
-            Vencidos recentes ({recentlyExpired.length})
-          </TabsTrigger>
-          <TabsTrigger value="expired">
-            Vencidos +45 dias ({expiredCerts.length})
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="expiring">
-          <CertificateTable 
-            data={expiringIn45Days} 
-            title="Certificados a Vencer" 
-            icon={Clock} 
-            color="bg-amber-500"
-          />
-        </TabsContent>
-
-        <TabsContent value="recent">
-          <CertificateTable 
-            data={recentlyExpired} 
-            title="Vencidos Recentemente" 
-            icon={AlertTriangle} 
-            color="bg-orange-500"
-          />
-        </TabsContent>
-
-        <TabsContent value="expired">
-          <CertificateTable 
-            data={expiredCerts} 
-            title="Vencidos há mais de 45 dias" 
-            icon={AlertTriangle} 
-            color="bg-red-500"
-          />
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }
