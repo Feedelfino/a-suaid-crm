@@ -54,15 +54,27 @@ export default function Renewals() {
 
   // 🎯 CONSOLIDAÇÃO: UM CERTIFICADO POR CLIENTE (regra obrigatória)
   const renewalsActive = useMemo(() => {
+    console.log('🔍 === DIAGNÓSTICO DE RENOVAÇÕES ===');
+    console.log(`Total de certificados no banco: ${allCertificates.length}`);
+    console.log(`Total de clientes no banco: ${allClients.length}`);
+    
     const today = new Date();
     const certsByClient = new Map();
+    const certsWithoutClient = [];
+    const certsRenovados = [];
 
     allCertificates.forEach(cert => {
-      // Ignorar certificados sem client_id válido
-      if (!cert.client_id) return;
+      // Análise: certificados sem client_id
+      if (!cert.client_id) {
+        certsWithoutClient.push(cert);
+        return;
+      }
 
-      // Ignorar certificados já renovados (histórico)
-      if (cert.renewal_status === 'renovado') return;
+      // Análise: certificados já renovados (histórico)
+      if (cert.renewal_status === 'renovado') {
+        certsRenovados.push(cert);
+        return;
+      }
 
       // Ignorar certificados sem data de expiração
       if (!cert.expiry_date) return;
@@ -73,22 +85,17 @@ export default function Renewals() {
       if (!existing) {
         certsByClient.set(cert.client_id, cert);
       } else {
-        // Já existe certificado para este cliente
-        // Prioridade: certificado mais próximo do vencimento (não renovado)
         const existingDate = parseISO(existing.expiry_date);
         const daysToExpiry = differenceInDays(expiryDate, today);
         const existingDaysToExpiry = differenceInDays(existingDate, today);
 
-        // Preferir certificados futuros sobre vencidos
         if (daysToExpiry >= 0 && existingDaysToExpiry < 0) {
           certsByClient.set(cert.client_id, cert);
         } else if (daysToExpiry >= 0 && existingDaysToExpiry >= 0) {
-          // Ambos futuros: manter o mais próximo
           if (daysToExpiry < existingDaysToExpiry) {
             certsByClient.set(cert.client_id, cert);
           }
         } else if (daysToExpiry < 0 && existingDaysToExpiry < 0) {
-          // Ambos vencidos: manter o mais recente
           if (daysToExpiry > existingDaysToExpiry) {
             certsByClient.set(cert.client_id, cert);
           }
@@ -96,6 +103,18 @@ export default function Renewals() {
       }
     });
 
+    console.log(`❌ Certificados SEM client_id: ${certsWithoutClient.length}`);
+    console.log(`✅ Certificados JÁ renovados (ignorados): ${certsRenovados.length}`);
+    console.log(`📊 Certificados ATIVOS após consolidação: ${certsByClient.size}`);
+
+    // Verificar clientes sem certificado
+    const clientsWithCerts = new Set(Array.from(certsByClient.keys()));
+    const clientsInDB = new Set(allClients.map(c => c.id));
+    const clientsWithoutCerts = allClients.filter(c => !clientsWithCerts.has(c.id));
+    
+    console.log(`👥 Clientes COM certificados ativos: ${clientsWithCerts.size}`);
+    console.log(`👥 Clientes SEM certificados: ${clientsWithoutCerts.length}`);
+    
     // Enriquecer com dados do cliente
     const enrichedRenewals = Array.from(certsByClient.values()).map(cert => {
       const client = allClients.find(c => c.id === cert.client_id);
@@ -104,6 +123,9 @@ export default function Renewals() {
         client_data: client || {}
       };
     });
+
+    console.log(`✅ RESULTADO FINAL: ${enrichedRenewals.length} renovações ativas`);
+    console.log('🔍 === FIM DO DIAGNÓSTICO ===\n');
 
     return enrichedRenewals;
   }, [allCertificates, allClients]);
