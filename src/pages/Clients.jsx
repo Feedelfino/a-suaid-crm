@@ -6,8 +6,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { 
   Search, Plus, User, Building2, Phone, Mail, 
-  Filter, MoreVertical, Eye, Edit, Trash2, AlertTriangle, Download, Users
+  Filter, MoreVertical, Eye, Edit, Trash2, AlertTriangle, Download, Users, Merge
 } from 'lucide-react';
+import DuplicateManager from '@/components/data/DuplicateManager';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,7 @@ export default function Clients() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
+  const [showDuplicateManager, setShowDuplicateManager] = useState(false);
 
   const { data: user } = useQuery({
     queryKey: ['current-user'],
@@ -189,14 +191,26 @@ export default function Clients() {
         </div>
         <div className="flex gap-3">
           {isAdmin && (
-            <Button 
-              variant="outline" 
-              onClick={() => migrateMutation.mutate()}
-              disabled={migrateMutation.isPending}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              {migrateMutation.isPending ? 'Migrando...' : 'Migrar Renovações'}
-            </Button>
+            <>
+              <Button 
+                variant="outline" 
+                onClick={() => migrateMutation.mutate()}
+                disabled={migrateMutation.isPending}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {migrateMutation.isPending ? 'Migrando...' : 'Migrar Renovações'}
+              </Button>
+              {duplicates.count > 0 && (
+                <Button
+                  onClick={() => setShowDuplicateManager(true)}
+                  variant="outline"
+                  className="border-amber-600 text-amber-600 hover:bg-amber-50"
+                >
+                  <Merge className="w-4 h-4 mr-2" />
+                  Gerenciar Duplicados ({duplicates.count})
+                </Button>
+              )}
+            </>
           )}
           <Link to={createPageUrl('ClientForm')}>
             <Button className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]">
@@ -455,6 +469,12 @@ export default function Clients() {
           </div>
         )}
       </Card>
+
+      <DuplicateManager
+        clients={clients}
+        open={showDuplicateManager}
+        onOpenChange={setShowDuplicateManager}
+      />
     </div>
   );
 }
