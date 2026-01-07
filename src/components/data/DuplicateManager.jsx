@@ -23,18 +23,55 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [primaryClientId, setPrimaryClientId] = useState(null);
 
+  // Função para calcular similaridade entre strings
+  const calculateSimilarity = (str1, str2) => {
+    if (!str1 || !str2) return 0;
+    const s1 = str1.toLowerCase().trim();
+    const s2 = str2.toLowerCase().trim();
+    if (s1 === s2) return 1;
+    
+    const longer = s1.length > s2.length ? s1 : s2;
+    const shorter = s1.length > s2.length ? s2 : s1;
+    
+    if (longer.length === 0) return 1.0;
+    
+    const editDistance = (s1, s2) => {
+      s1 = s1.toLowerCase();
+      s2 = s2.toLowerCase();
+      const costs = [];
+      for (let i = 0; i <= s1.length; i++) {
+        let lastValue = i;
+        for (let j = 0; j <= s2.length; j++) {
+          if (i === 0) {
+            costs[j] = j;
+          } else if (j > 0) {
+            let newValue = costs[j - 1];
+            if (s1.charAt(i - 1) !== s2.charAt(j - 1)) {
+              newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+            }
+            costs[j - 1] = lastValue;
+            lastValue = newValue;
+          }
+        }
+        if (i > 0) costs[s2.length] = lastValue;
+      }
+      return costs[s2.length];
+    };
+    
+    return (longer.length - editDistance(longer, shorter)) / longer.length;
+  };
+
   // Detectar grupos de duplicados
   const duplicateGroups = useMemo(() => {
     const groups = [];
     const seen = new Map();
     
+    // Agrupar por CPF, CNPJ e E-mail
     clients.forEach(client => {
       const identifiers = [
-        client.cpf?.replace(/\D/g, ''),
-        client.cnpj?.replace(/\D/g, ''),
-        client.email?.toLowerCase(),
-        client.phone?.replace(/\D/g, ''),
-        client.whatsapp?.replace(/\D/g, '')
+        client.cpf?.replace(/\D/g, '') ? `cpf:${client.cpf.replace(/\D/g, '')}` : null,
+        client.cnpj?.replace(/\D/g, '') ? `cnpj:${client.cnpj.replace(/\D/g, '')}` : null,
+        client.email?.toLowerCase().trim() ? `email:${client.email.toLowerCase().trim()}` : null,
       ].filter(Boolean);
       
       identifiers.forEach(id => {
@@ -47,6 +84,7 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
       });
     });
     
+    // Consolidar grupos de CPF/CNPJ/E-mail
     seen.forEach((clientList, identifier) => {
       if (clientList.length > 1) {
         const existingGroup = groups.find(g => 
@@ -70,6 +108,40 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
         }
       }
     });
+    
+    // Detectar nomes similares (similaridade > 85%)
+    for (let i = 0; i < clients.length; i++) {
+      for (let j = i + 1; j < clients.length; j++) {
+        const client1 = clients[i];
+        const client2 = clients[j];
+        
+        const similarity = calculateSimilarity(client1.client_name, client2.client_name);
+        
+        if (similarity > 0.85) {
+          const existingGroup = groups.find(g => 
+            g.clients.some(c => c.id === client1.id || c.id === client2.id)
+          );
+          
+          if (existingGroup) {
+            if (!existingGroup.clients.some(c => c.id === client1.id)) {
+              existingGroup.clients.push(client1);
+            }
+            if (!existingGroup.clients.some(c => c.id === client2.id)) {
+              existingGroup.clients.push(client2);
+            }
+            const reason = `nome:${client1.client_name}`;
+            if (!existingGroup.reasons.includes(reason)) {
+              existingGroup.reasons.push(reason);
+            }
+          } else {
+            groups.push({
+              clients: [client1, client2],
+              reasons: [`nome:${client1.client_name}`]
+            });
+          }
+        }
+      }
+    }
     
     return groups;
   }, [clients]);
@@ -200,9 +272,10 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                         </CardTitle>
                         <p className="text-xs text-slate-500 mt-1">
                           Motivos: {group.reasons.map(r => 
-                            r.includes('@') ? 'E-mail' : 
-                            r.length === 11 ? 'CPF' : 
-                            r.length === 14 ? 'CNPJ' : 'Telefone'
+                            r.startsWith('cpf:') ? 'CPF' : 
+                            r.startsWith('cnpj:') ? 'CNPJ' : 
+                            r.startsWith('email:') ? 'E-mail' : 
+                            r.startsWith('nome:') ? 'Nome similar' : 'Outro'
                           ).join(', ')}
                         </p>
                       </div>

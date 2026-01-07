@@ -71,19 +71,55 @@ export default function Clients() {
 
   const isAdmin = user?.role === 'admin';
 
-  // Detectar duplicados por CPF, CNPJ, Email e Telefone
+  // Função para calcular similaridade entre strings
+  const calculateSimilarity = (str1, str2) => {
+    if (!str1 || !str2) return 0;
+    const s1 = str1.toLowerCase().trim();
+    const s2 = str2.toLowerCase().trim();
+    if (s1 === s2) return 1;
+    
+    const longer = s1.length > s2.length ? s1 : s2;
+    const shorter = s1.length > s2.length ? s2 : s1;
+    if (longer.length === 0) return 1.0;
+    
+    const editDistance = (s1, s2) => {
+      s1 = s1.toLowerCase();
+      s2 = s2.toLowerCase();
+      const costs = [];
+      for (let i = 0; i <= s1.length; i++) {
+        let lastValue = i;
+        for (let j = 0; j <= s2.length; j++) {
+          if (i === 0) {
+            costs[j] = j;
+          } else if (j > 0) {
+            let newValue = costs[j - 1];
+            if (s1.charAt(i - 1) !== s2.charAt(j - 1)) {
+              newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+            }
+            costs[j - 1] = lastValue;
+            lastValue = newValue;
+          }
+        }
+        if (i > 0) costs[s2.length] = lastValue;
+      }
+      return costs[s2.length];
+    };
+    
+    return (longer.length - editDistance(longer, shorter)) / longer.length;
+  };
+
+  // Detectar duplicados por CPF, CNPJ, Email e Nome similar
   const duplicates = React.useMemo(() => {
     const cpfMap = {};
     const cnpjMap = {};
     const emailMap = {};
-    const phoneMap = {};
     const duplicatedIds = new Set();
 
+    // Detectar por CPF, CNPJ e E-mail
     clients.forEach(client => {
       const cpf = client.cpf?.replace(/\D/g, '');
       const cnpj = client.cnpj?.replace(/\D/g, '');
       const email = client.email?.toLowerCase().trim();
-      const phone = client.phone?.replace(/\D/g, '');
 
       if (cpf && cpf.length === 11) {
         if (cpfMap[cpf]) {
@@ -111,16 +147,18 @@ export default function Clients() {
           emailMap[email] = client.id;
         }
       }
+    });
 
-      if (phone && phone.length >= 10) {
-        if (phoneMap[phone]) {
-          duplicatedIds.add(client.id);
-          duplicatedIds.add(phoneMap[phone]);
-        } else {
-          phoneMap[phone] = client.id;
+    // Detectar nomes similares (similaridade > 85%)
+    for (let i = 0; i < clients.length; i++) {
+      for (let j = i + 1; j < clients.length; j++) {
+        const similarity = calculateSimilarity(clients[i].client_name, clients[j].client_name);
+        if (similarity > 0.85) {
+          duplicatedIds.add(clients[i].id);
+          duplicatedIds.add(clients[j].id);
         }
       }
-    });
+    }
 
     return {
       ids: duplicatedIds,
@@ -295,7 +333,7 @@ export default function Clients() {
                   {duplicates.count} cadastros duplicados detectados
                 </p>
                 <p className="text-sm text-amber-800 mt-1">
-                  Clientes com mesmo CPF, CNPJ, e-mail ou telefone. Recomenda-se revisar e consolidar os registros.
+                  Clientes com mesmo CPF, CNPJ, e-mail ou nome similar. Recomenda-se revisar e consolidar os registros.
                 </p>
               </div>
             </div>
