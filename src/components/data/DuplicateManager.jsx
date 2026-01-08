@@ -74,6 +74,13 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
     const groups = [];
     const seen = new Map();
     
+    // Função para verificar se dois clientes foram marcados como não-duplicados
+    const isMarkedAsNotDuplicate = (client1, client2) => {
+      const list1 = client1.not_duplicate_with || [];
+      const list2 = client2.not_duplicate_with || [];
+      return list1.includes(client2.id) || list2.includes(client1.id);
+    };
+    
     // Agrupar por CPF, CNPJ e E-mail
     clients.forEach(client => {
       const identifiers = [
@@ -92,17 +99,34 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
       });
     });
     
-    // Consolidar grupos de CPF/CNPJ/E-mail
+    // Consolidar grupos de CPF/CNPJ/E-mail (excluindo pares marcados como não-duplicados)
     seen.forEach((clientList, identifier) => {
       if (clientList.length > 1) {
+        // Filtrar clientes que foram marcados como não-duplicados entre si
+        const validPairs = [];
+        for (let i = 0; i < clientList.length; i++) {
+          for (let j = i + 1; j < clientList.length; j++) {
+            if (!isMarkedAsNotDuplicate(clientList[i], clientList[j])) {
+              validPairs.push([clientList[i], clientList[j]]);
+            }
+          }
+        }
+        
+        if (validPairs.length === 0) return;
+        
         const existingGroup = groups.find(g => 
-          g.clients.some(c => clientList.some(cl => cl.id === c.id))
+          g.clients.some(c => clientList.some(cl => cl.id === c.id && !isMarkedAsNotDuplicate(c, cl)))
         );
         
         if (existingGroup) {
           clientList.forEach(c => {
             if (!existingGroup.clients.some(ec => ec.id === c.id)) {
-              existingGroup.clients.push(c);
+              const hasValidPair = clientList.some(cl => 
+                cl.id !== c.id && !isMarkedAsNotDuplicate(c, cl)
+              );
+              if (hasValidPair) {
+                existingGroup.clients.push(c);
+              }
             }
           });
           if (!existingGroup.reasons.includes(identifier)) {
@@ -117,11 +141,14 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
       }
     });
     
-    // Detectar nomes similares (similaridade > 85%)
+    // Detectar nomes similares (similaridade > 85%, excluindo marcados como não-duplicados)
     for (let i = 0; i < clients.length; i++) {
       for (let j = i + 1; j < clients.length; j++) {
         const client1 = clients[i];
         const client2 = clients[j];
+        
+        // Pular se já foram marcados como não-duplicados
+        if (isMarkedAsNotDuplicate(client1, client2)) continue;
         
         const similarity = calculateSimilarity(client1.client_name, client2.client_name);
         
@@ -271,9 +298,31 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
     }
   };
 
-  const handleMarkAsNotDuplicate = (groupIndex) => {
-    if (confirm('Confirma que estes cadastros NÃO são duplicados? Eles serão removidos desta lista.')) {
-      setNotDuplicateGroups(prev => new Set([...prev, groupIndex]));
+  const handleMarkAsNotDuplicate = async (group, groupIndex) => {
+    if (confirm('Confirma que estes cadastros NÃO são duplicados? Esta informação será salva no sistema.')) {
+      try {
+        // Marcar cada cliente como não-duplicado em relação aos outros do grupo
+        const clientIds = group.clients.map(c => c.id);
+        
+        await Promise.all(
+          group.clients.map(async (client) => {
+            const otherIds = clientIds.filter(id => id !== client.id);
+            const existingList = client.not_duplicate_with || [];
+            const newList = [...new Set([...existingList, ...otherIds])];
+            
+            await base44.entities.Client.update(client.id, {
+              not_duplicate_with: newList
+            });
+          })
+        );
+        
+        setNotDuplicateGroups(prev => new Set([...prev, groupIndex]));
+        queryClient.invalidateQueries(['clients']);
+        alert('✅ Marcado como não-duplicado no sistema!');
+      } catch (error) {
+        console.error('Erro ao marcar como não-duplicado:', error);
+        alert('Erro ao salvar: ' + error.message);
+      }
     }
   };
 
@@ -433,7 +482,7 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                         <Button 
                           size="sm"
                           variant="outline"
-                          onClick={() => handleMarkAsNotDuplicate(idx)}
+                          onClick={() => handleMarkAsNotDuplicate(group, idx)}
                           className="border-slate-300 text-slate-600 hover:bg-slate-50"
                         >
                           <X className="w-4 h-4 mr-2" />
