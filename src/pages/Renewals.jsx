@@ -547,12 +547,12 @@ export default function Renewals() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="overflow-x-auto max-w-full">
+            <Table className="min-w-full">
               <TableHeader>
                 <TableRow className="bg-slate-50">
                   <TableHead 
-                    className="font-semibold cursor-pointer"
+                    className="font-semibold cursor-pointer min-w-[250px]"
                     onClick={() => toggleSort('client_name')}
                   >
                     <div className="flex items-center gap-2">
@@ -562,9 +562,9 @@ export default function Renewals() {
                       )}
                     </div>
                   </TableHead>
-                  <TableHead className="font-semibold">Tipo</TableHead>
+                  <TableHead className="font-semibold min-w-[120px]">Tipo</TableHead>
                   <TableHead 
-                    className="font-semibold cursor-pointer"
+                    className="font-semibold cursor-pointer min-w-[140px]"
                     onClick={() => toggleSort('expiry_date')}
                   >
                     <div className="flex items-center gap-2">
@@ -574,9 +574,9 @@ export default function Renewals() {
                       )}
                     </div>
                   </TableHead>
-                  <TableHead className="font-semibold">Status</TableHead>
-                  <TableHead className="font-semibold">Responsável</TableHead>
-                  <TableHead className="w-24"></TableHead>
+                  <TableHead className="font-semibold min-w-[140px]">Status</TableHead>
+                  <TableHead className="font-semibold min-w-[120px]">Responsável</TableHead>
+                  <TableHead className="w-24 sticky right-0 bg-slate-50"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -660,7 +660,7 @@ export default function Renewals() {
                       <TableCell>
                         <span className="text-sm text-slate-600">{renewal.assigned_agent || '-'}</span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="sticky right-0 bg-white">
                         <div className="flex items-center gap-1">
                           <Link to={createPageUrl(`ClientDetails?id=${renewal.client_id}`)}>
                             <Button variant="ghost" size="icon">

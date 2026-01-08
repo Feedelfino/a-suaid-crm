@@ -392,16 +392,16 @@ export default function Clients() {
 
       {/* Table */}
       <Card className="border-0 shadow-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
+        <div className="overflow-x-auto max-w-full">
+          <Table className="min-w-full">
             <TableHeader>
               <TableRow className="bg-slate-50">
-                <TableHead className="font-semibold">Cliente</TableHead>
-                <TableHead className="font-semibold">Contato</TableHead>
-                <TableHead className="font-semibold">Status</TableHead>
-                <TableHead className="font-semibold">Origem</TableHead>
-                <TableHead className="font-semibold">Data Cadastro</TableHead>
-                <TableHead className="w-12"></TableHead>
+                <TableHead className="font-semibold min-w-[200px]">Cliente</TableHead>
+                <TableHead className="font-semibold min-w-[200px]">Contato</TableHead>
+                <TableHead className="font-semibold min-w-[120px]">Status</TableHead>
+                <TableHead className="font-semibold min-w-[100px]">Origem</TableHead>
+                <TableHead className="font-semibold min-w-[120px]">Data Cadastro</TableHead>
+                <TableHead className="w-12 sticky right-0 bg-slate-50"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -460,7 +460,7 @@ export default function Clients() {
                       {client.created_date ? format(parseISO(client.created_date), 'dd/MM/yyyy') : '-'}
                     </span>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="sticky right-0 bg-white">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">

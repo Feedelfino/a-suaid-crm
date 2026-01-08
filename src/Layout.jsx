@@ -42,6 +42,7 @@ import NotificationCenter from '@/components/notifications/NotificationCenter';
 export default function Layout({ children, currentPageName }) {
   const [user, setUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [accessStatus, setAccessStatus] = useState(null); // 'approved', 'pending', 'rejected', null
 
@@ -189,17 +190,40 @@ export default function Layout({ children, currentPageName }) {
       `}</style>
 
       {/* Sidebar - Desktop */}
-      <aside className="hidden lg:flex fixed left-0 top-0 h-full w-64 bg-white border-r border-slate-200 flex-col z-40 shadow-lg">
+      <aside className={`hidden lg:flex fixed left-0 top-0 h-full ${sidebarCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-slate-200 flex-col z-40 shadow-lg transition-all duration-300`}>
         {/* Logo */}
         <div className="p-6 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#6B2D8B] to-[#C71585] flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-lg">A</span>
-            </div>
-            <div>
-              <h1 className="font-bold text-[#6B2D8B] text-xl tracking-tight">SUA.ID</h1>
-              <p className="text-xs text-slate-500">CRM Digital</p>
-            </div>
+          <div className="flex items-center justify-between gap-3">
+            {!sidebarCollapsed ? (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#6B2D8B] to-[#C71585] flex items-center justify-center shadow-lg">
+                    <span className="text-white font-bold text-lg">A</span>
+                  </div>
+                  <div>
+                    <h1 className="font-bold text-[#6B2D8B] text-xl tracking-tight">SUA.ID</h1>
+                    <p className="text-xs text-slate-500">CRM Digital</p>
+                  </div>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setSidebarCollapsed(true)}
+                  className="shrink-0"
+                >
+                  <ChevronDown className="w-5 h-5 rotate-90" />
+                </Button>
+              </>
+            ) : (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setSidebarCollapsed(false)}
+                className="mx-auto"
+              >
+                <ChevronDown className="w-5 h-5 -rotate-90" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -211,49 +235,52 @@ export default function Layout({ children, currentPageName }) {
               <Link
                 key={item.page}
                 to={createPageUrl(item.page)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+                className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl transition-all duration-200 group ${
                   isActive 
                     ? 'bg-gradient-to-r from-[#6B2D8B] to-[#8B4DAB] text-white shadow-md' 
                     : 'text-slate-600 hover:bg-slate-50 hover:text-[#6B2D8B]'
                 }`}
+                title={sidebarCollapsed ? item.name : ''}
               >
                 <item.icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-[#6B2D8B]'}`} />
-                <span className="font-medium text-sm">{item.name}</span>
+                {!sidebarCollapsed && <span className="font-medium text-sm">{item.name}</span>}
               </Link>
             );
           })}
         </nav>
 
         {/* Social Links */}
-        <div className="p-4 border-t border-slate-100">
-          <div className="flex items-center justify-center gap-3 mb-4">
+        {!sidebarCollapsed && (
+          <div className="p-4 border-t border-slate-100">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <a
+                href="https://www.linkedin.com/in/asuaid/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-xl bg-[#0077B5] flex items-center justify-center text-white hover:opacity-90 transition-opacity shadow-sm"
+              >
+                <Linkedin className="w-5 h-5" />
+              </a>
+              <a
+                href="https://instagram.com/asuaidcertificadora"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#833AB4] via-[#FD1D1D] to-[#FCAF45] flex items-center justify-center text-white hover:opacity-90 transition-opacity shadow-sm"
+              >
+                <Instagram className="w-5 h-5" />
+              </a>
+            </div>
             <a
-              href="https://www.linkedin.com/in/asuaid/"
+              href="https://www.asuaiddigital.com.br/"
               target="_blank"
               rel="noopener noreferrer"
-              className="w-10 h-10 rounded-xl bg-[#0077B5] flex items-center justify-center text-white hover:opacity-90 transition-opacity shadow-sm"
+              className="flex items-center justify-center gap-2 text-sm text-[#6B2D8B] hover:underline"
             >
-              <Linkedin className="w-5 h-5" />
-            </a>
-            <a
-              href="https://instagram.com/asuaidcertificadora"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#833AB4] via-[#FD1D1D] to-[#FCAF45] flex items-center justify-center text-white hover:opacity-90 transition-opacity shadow-sm"
-            >
-              <Instagram className="w-5 h-5" />
+              <Globe className="w-4 h-4" />
+              Nosso Site
             </a>
           </div>
-          <a
-            href="https://www.asuaiddigital.com.br/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 text-sm text-[#6B2D8B] hover:underline"
-          >
-            <Globe className="w-4 h-4" />
-            Nosso Site
-          </a>
-        </div>
+        )}
       </aside>
 
       {/* Mobile Sidebar Overlay */}
@@ -302,7 +329,7 @@ export default function Layout({ children, currentPageName }) {
       </aside>
 
       {/* Main Content */}
-      <div className="lg:ml-64">
+      <div className={`${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} transition-all duration-300`}>
         {/* Header */}
         <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-lg border-b border-slate-200">
           <div className="flex items-center justify-between px-4 lg:px-8 py-4">
