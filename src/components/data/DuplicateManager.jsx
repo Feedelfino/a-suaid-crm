@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { 
   AlertTriangle, Users, Merge, X, Check, 
   Phone, Mail, Building2, User, CheckCircle2,
-  ArrowRight, FileSearch, Edit3
+  ArrowRight, FileSearch, Edit3, History, Sparkles
 } from 'lucide-react';
 import {
   Dialog,
@@ -30,6 +30,8 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editedData, setEditedData] = useState({});
+  const [fieldSelection, setFieldSelection] = useState({});
+  const [showHistory, setShowHistory] = useState(false);
 
   // Função para calcular similaridade entre strings
   const calculateSimilarity = (str1, str2) => {
@@ -81,12 +83,21 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
       return list1.includes(client2.id) || list2.includes(client1.id);
     };
     
-    // Agrupar por CPF, CNPJ e E-mail
+    // Agrupar por CPF, CNPJ, E-mail, Telefone e Endereço
     clients.forEach(client => {
+      const phone = client.phone?.replace(/\D/g, '');
+      const whatsapp = client.whatsapp?.replace(/\D/g, '');
+      const cnpj = client.cnpj?.replace(/\D/g, '');
+      const address = client.address?.toLowerCase().trim();
+      
       const identifiers = [
         client.cpf?.replace(/\D/g, '') ? `cpf:${client.cpf.replace(/\D/g, '')}` : null,
-        client.cnpj?.replace(/\D/g, '') ? `cnpj:${client.cnpj.replace(/\D/g, '')}` : null,
+        cnpj ? `cnpj:${cnpj}` : null,
+        cnpj && cnpj.length >= 8 ? `cnpj_partial:${cnpj.substring(0, 8)}` : null,
         client.email?.toLowerCase().trim() ? `email:${client.email.toLowerCase().trim()}` : null,
+        phone && phone.length >= 8 ? `phone:${phone.slice(-8)}` : null,
+        whatsapp && whatsapp.length >= 8 ? `phone:${whatsapp.slice(-8)}` : null,
+        address && address.length > 10 ? `address:${address}` : null,
       ].filter(Boolean);
       
       identifiers.forEach(id => {
@@ -182,8 +193,10 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
   }, [clients]);
 
   const mergeMutation = useMutation({
-    mutationFn: async ({ primaryId, duplicateIds }) => {
-      console.log('🔄 Iniciando unificação:', { primaryId, duplicateIds });
+    mutationFn: async ({ primaryId, duplicateIds, unifiedData, selectedFields, removedClientsData, reason }) => {
+      console.log('🔄 Iniciando unificação:', { primaryId, duplicateIds, unifiedData });
+      
+      const user = await base44.auth.me();
       
       // Buscar todos os registros relacionados
       const [interactions, appointments, certificates, tasks] = await Promise.all([
@@ -244,11 +257,34 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
         );
       }
 
+      // Atualizar cliente principal com dados unificados
+      console.log('📝 Atualizando cliente principal com campos selecionados...');
+      await base44.entities.Client.update(primaryId, unifiedData);
+
       // Deletar clientes duplicados
       console.log(`🗑️ Removendo ${duplicateIds.length} cadastros duplicados...`);
       await Promise.all(
         duplicateIds.map(id => base44.entities.Client.delete(id))
       );
+
+      // Criar histórico de unificação
+      console.log('📚 Registrando histórico...');
+      await base44.entities.UnificationHistory.create({
+        unified_client_id: primaryId,
+        unified_client_name: unifiedData.client_name,
+        removed_client_ids: duplicateIds,
+        removed_clients_data: removedClientsData,
+        selected_fields: selectedFields,
+        unification_reason: reason,
+        records_transferred: {
+          interactions: interactionsToUpdate.length,
+          appointments: appointmentsToUpdate.length,
+          certificates: certificatesToUpdate.length,
+          tasks: tasksToUpdate.length
+        },
+        performed_by: user?.email || 'unknown',
+        performed_at: new Date().toISOString()
+      });
 
       console.log('✅ Unificação concluída com sucesso!');
     },
@@ -273,26 +309,79 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
     setSelectedClientsInGroup(group.clients.map(c => c.id));
     setEditMode(false);
     setEditedData({});
+    
+    // Inicializar seleção de campos com o primeiro cliente
+    const initialSelection = {};
+    const fields = ['client_name', 'company_name', 'cpf', 'cnpj', 'email', 'phone', 'whatsapp', 'address', 'business_area', 'notes'];
+    fields.forEach(field => {
+      initialSelection[field] = group.clients[0].id;
+    });
+    setFieldSelection(initialSelection);
   };
 
   const handleAnalyzeGroup = async (group, groupIndex) => {
     setIsAnalyzing(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Usar IA para análise inteligente de duplicados
+      const clientsData = group.clients.map(c => ({
+        id: c.id,
+        nome: c.client_name,
+        empresa: c.company_name,
+        cpf: c.cpf,
+        cnpj: c.cnpj,
+        email: c.email,
+        telefone: c.phone || c.whatsapp,
+        endereco: c.address
+      }));
+      
+      const analysis = await base44.integrations.Core.InvokeLLM({
+        prompt: `Analise se estes cadastros são duplicados da mesma pessoa/empresa:
+${JSON.stringify(clientsData, null, 2)}
+
+Responda em JSON com:
+- is_duplicate: true/false
+- confidence: 0-100 (%)
+- reason: explicação breve
+- suggested_primary: ID do melhor registro (mais completo)
+- field_recommendations: para cada campo, qual ID tem o melhor valor`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            is_duplicate: { type: "boolean" },
+            confidence: { type: "number" },
+            reason: { type: "string" },
+            suggested_primary: { type: "string" },
+            field_recommendations: { 
+              type: "object",
+              properties: {
+                client_name: { type: "string" },
+                company_name: { type: "string" },
+                email: { type: "string" },
+                phone: { type: "string" }
+              }
+            }
+          }
+        }
+      });
       
       setAnalyzedGroups(prev => new Set([...prev, groupIndex]));
       
-      // Marcar automaticamente duplicados óbvios
-      const uniqueEmails = new Set(group.clients.map(c => c.email).filter(Boolean));
-      const uniqueCPFs = new Set(group.clients.map(c => c.cpf?.replace(/\D/g, '')).filter(Boolean));
-      
-      if (uniqueEmails.size === 1 && group.clients.length > 1) {
+      if (analysis.is_duplicate && analysis.confidence > 70) {
         handleSelectGroup(group);
-      } else if (uniqueCPFs.size === 1 && group.clients.length > 1) {
-        handleSelectGroup(group);
+        
+        // Aplicar recomendações de campos
+        if (analysis.field_recommendations) {
+          setFieldSelection(analysis.field_recommendations);
+        }
+        
+        // Definir primário sugerido
+        if (analysis.suggested_primary) {
+          setPrimaryClientId(analysis.suggested_primary);
+        }
       }
     } catch (error) {
       console.error('Erro ao analisar:', error);
+      setAnalyzedGroups(prev => new Set([...prev, groupIndex]));
     } finally {
       setIsAnalyzing(false);
     }
@@ -362,19 +451,33 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
     });
   };
 
-  const handleMerge = () => {
+  const handleMerge = async () => {
     if (!primaryClientId || !selectedGroup) return;
 
-    const duplicateIds = selectedClientsInGroup
-      .filter(id => id !== primaryClientId);
-
+    const duplicateIds = selectedClientsInGroup.filter(id => id !== primaryClientId);
     if (duplicateIds.length === 0) {
       alert('Selecione pelo menos um cadastro duplicado para unificar.');
       return;
     }
 
+    // Construir dados unificados com campos selecionados
+    const unifiedData = {};
+    Object.entries(fieldSelection).forEach(([field, clientId]) => {
+      const client = selectedGroup.clients.find(c => c.id === clientId);
+      if (client && client[field]) {
+        unifiedData[field] = client[field];
+      }
+    });
+
     if (confirm(`Confirma a unificação de ${duplicateIds.length} cadastro(s) duplicado(s)? Esta ação não pode ser desfeita.`)) {
-      mergeMutation.mutate({ primaryId: primaryClientId, duplicateIds });
+      mergeMutation.mutate({ 
+        primaryId: primaryClientId, 
+        duplicateIds,
+        unifiedData,
+        selectedFields: fieldSelection,
+        removedClientsData: selectedGroup.clients.filter(c => duplicateIds.includes(c.id)),
+        reason: selectedGroup.reasons.join(', ')
+      });
     }
   };
 
@@ -450,8 +553,11 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                         <p className="text-xs text-slate-500 mt-1">
                           Motivos: {group.reasons.map(r => 
                             r.startsWith('cpf:') ? 'CPF' : 
+                            r.startsWith('cnpj_partial:') ? 'CNPJ Parcial' :
                             r.startsWith('cnpj:') ? 'CNPJ' : 
-                            r.startsWith('email:') ? 'E-mail' : 
+                            r.startsWith('email:') ? 'E-mail' :
+                            r.startsWith('phone:') ? 'Telefone' :
+                            r.startsWith('address:') ? 'Endereço' :
                             r.startsWith('nome:') ? 'Nome similar' : 'Outro'
                           ).join(', ')}
                         </p>
@@ -462,14 +568,14 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                           variant="outline"
                           onClick={() => handleAnalyzeGroup(group, idx)}
                           disabled={isAnalyzing}
-                          className={analyzedGroups.has(idx) ? 'border-green-500 text-green-700' : ''}
+                          className={analyzedGroups.has(idx) ? 'border-green-500 text-green-700 bg-green-50' : ''}
                         >
                           {isAnalyzing ? (
                             <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
                           ) : (
-                            <FileSearch className="w-4 h-4 mr-2" />
+                            <Sparkles className="w-4 h-4 mr-2" />
                           )}
-                          {analyzedGroups.has(idx) ? 'Analisado' : 'Analisar'}
+                          {analyzedGroups.has(idx) ? '✓ Analisado com IA' : 'Analisar com IA'}
                         </Button>
                         <Button 
                           size="sm"
@@ -525,10 +631,20 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
       <Dialog open={!!selectedGroup} onOpenChange={(o) => !o && setSelectedGroup(null)}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Merge className="w-5 h-5 text-blue-600" />
-              Revisar e Unificar Cadastros
-            </DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2">
+                <Merge className="w-5 h-5 text-blue-600" />
+                Revisar e Unificar Cadastros
+              </DialogTitle>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowHistory(!showHistory)}
+              >
+                <History className="w-4 h-4 mr-2" />
+                Histórico
+              </Button>
+            </div>
           </DialogHeader>
 
           {selectedGroup && (
@@ -601,12 +717,72 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                 </CardContent>
               </Card>
 
-              {/* Comparação de Campos */}
+              {/* Seleção Inteligente de Campos */}
+              <Card className="border-purple-200 bg-purple-50/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-purple-600" />
+                    2. Selecione os melhores dados de cada campo
+                  </CardTitle>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Clique em cada campo para escolher qual valor manter no registro unificado
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {['client_name', 'company_name', 'cpf', 'cnpj', 'email', 'phone', 'whatsapp', 'address', 'business_area', 'notes'].map(field => {
+                    const fieldLabels = {
+                      client_name: 'Nome',
+                      company_name: 'Empresa',
+                      cpf: 'CPF',
+                      cnpj: 'CNPJ',
+                      email: 'E-mail',
+                      phone: 'Telefone',
+                      whatsapp: 'WhatsApp',
+                      address: 'Endereço',
+                      business_area: 'Área',
+                      notes: 'Observações'
+                    };
+                    
+                    return (
+                      <div key={field} className="border-b border-purple-100 last:border-0 pb-3">
+                        <p className="text-xs font-medium text-slate-500 uppercase mb-2">{fieldLabels[field]}</p>
+                        <div className="grid gap-2">
+                          {selectedGroup.clients.filter(c => selectedClientsInGroup.includes(c.id)).map((client, idx) => {
+                            const isSelected = fieldSelection[field] === client.id;
+                            const value = client[field];
+                            if (!value) return null;
+                            
+                            return (
+                              <button
+                                key={client.id}
+                                onClick={() => setFieldSelection(prev => ({ ...prev, [field]: client.id }))}
+                                className={`text-left p-2 rounded-lg border-2 transition-all ${
+                                  isSelected 
+                                    ? 'border-purple-500 bg-purple-100 font-medium' 
+                                    : 'border-slate-200 bg-white hover:border-purple-300'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-slate-800">{value}</span>
+                                  {isSelected && <Check className="w-4 h-4 text-purple-600" />}
+                                </div>
+                                <span className="text-xs text-slate-400">Cadastro #{idx + 1}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+
+              {/* Comparação de Campos (Original) */}
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">
-                      2. Compare os dados (cadastros não selecionados serão removidos)
+                      3. Comparação completa (referência)
                     </CardTitle>
                     <Button 
                       size="sm"
