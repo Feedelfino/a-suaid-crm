@@ -156,42 +156,88 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
 
   const mergeMutation = useMutation({
     mutationFn: async ({ primaryId, duplicateIds }) => {
-      // Buscar todos os registros relacionados e transferi-los para o cliente principal
-      const [interactions, appointments] = await Promise.all([
+      console.log('🔄 Iniciando unificação:', { primaryId, duplicateIds });
+      
+      // Buscar todos os registros relacionados
+      const [interactions, appointments, certificates, tasks] = await Promise.all([
         base44.entities.Interaction.list(),
-        base44.entities.Appointment.list()
+        base44.entities.Appointment.list(),
+        base44.entities.Certificate.list(),
+        base44.entities.Task.list()
       ]);
 
+      console.log('📊 Registros encontrados:', {
+        interactions: interactions.length,
+        appointments: appointments.length,
+        certificates: certificates.length,
+        tasks: tasks.length
+      });
+
       // Atualizar interações
-      const interactionsToUpdate = interactions.filter(i => 
-        duplicateIds.includes(i.client_id)
-      );
-      await Promise.all(
-        interactionsToUpdate.map(i => 
-          base44.entities.Interaction.update(i.id, { client_id: primaryId })
-        )
-      );
+      const interactionsToUpdate = interactions.filter(i => duplicateIds.includes(i.client_id));
+      if (interactionsToUpdate.length > 0) {
+        console.log(`📝 Transferindo ${interactionsToUpdate.length} interações...`);
+        await Promise.all(
+          interactionsToUpdate.map(i => 
+            base44.entities.Interaction.update(i.id, { client_id: primaryId })
+          )
+        );
+      }
 
       // Atualizar agendamentos
-      const appointmentsToUpdate = appointments.filter(a => 
-        duplicateIds.includes(a.client_id)
-      );
-      await Promise.all(
-        appointmentsToUpdate.map(a => 
-          base44.entities.Appointment.update(a.id, { client_id: primaryId })
-        )
-      );
+      const appointmentsToUpdate = appointments.filter(a => duplicateIds.includes(a.client_id));
+      if (appointmentsToUpdate.length > 0) {
+        console.log(`📅 Transferindo ${appointmentsToUpdate.length} agendamentos...`);
+        await Promise.all(
+          appointmentsToUpdate.map(a => 
+            base44.entities.Appointment.update(a.id, { client_id: primaryId })
+          )
+        );
+      }
+
+      // Atualizar certificados
+      const certificatesToUpdate = certificates.filter(c => duplicateIds.includes(c.client_id));
+      if (certificatesToUpdate.length > 0) {
+        console.log(`📜 Transferindo ${certificatesToUpdate.length} certificados...`);
+        await Promise.all(
+          certificatesToUpdate.map(c => 
+            base44.entities.Certificate.update(c.id, { client_id: primaryId })
+          )
+        );
+      }
+
+      // Atualizar tarefas
+      const tasksToUpdate = tasks.filter(t => duplicateIds.includes(t.client_id));
+      if (tasksToUpdate.length > 0) {
+        console.log(`✅ Transferindo ${tasksToUpdate.length} tarefas...`);
+        await Promise.all(
+          tasksToUpdate.map(t => 
+            base44.entities.Task.update(t.id, { client_id: primaryId })
+          )
+        );
+      }
 
       // Deletar clientes duplicados
+      console.log(`🗑️ Removendo ${duplicateIds.length} cadastros duplicados...`);
       await Promise.all(
         duplicateIds.map(id => base44.entities.Client.delete(id))
       );
+
+      console.log('✅ Unificação concluída com sucesso!');
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['clients']);
+      queryClient.invalidateQueries(['certificates']);
+      queryClient.invalidateQueries(['existing-clients-for-import']);
+      alert('✅ Cadastros unificados com sucesso!');
       setSelectedGroup(null);
       setPrimaryClientId(null);
+      setSelectedClientsInGroup([]);
     },
+    onError: (error) => {
+      console.error('❌ Erro ao unificar:', error);
+      alert('Erro ao unificar cadastros: ' + error.message);
+    }
   });
 
   const handleSelectGroup = (group) => {
@@ -226,7 +272,9 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
   };
 
   const handleMarkAsNotDuplicate = (groupIndex) => {
-    setNotDuplicateGroups(prev => new Set([...prev, groupIndex]));
+    if (confirm('Confirma que estes cadastros NÃO são duplicados? Eles serão removidos desta lista.')) {
+      setNotDuplicateGroups(prev => new Set([...prev, groupIndex]));
+    }
   };
 
   const handleFieldChange = (field, value) => {
