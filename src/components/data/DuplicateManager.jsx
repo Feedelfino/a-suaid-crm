@@ -26,6 +26,7 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
   const [primaryClientId, setPrimaryClientId] = useState(null);
   const [selectedClientsInGroup, setSelectedClientsInGroup] = useState([]);
   const [analyzedGroups, setAnalyzedGroups] = useState(new Set());
+  const [notDuplicateGroups, setNotDuplicateGroups] = useState(new Set());
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editedData, setEditedData] = useState({});
@@ -204,7 +205,6 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
   const handleAnalyzeGroup = async (group, groupIndex) => {
     setIsAnalyzing(true);
     try {
-      // Simular análise (pode adicionar lógica de IA aqui)
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       setAnalyzedGroups(prev => new Set([...prev, groupIndex]));
@@ -214,10 +214,8 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
       const uniqueCPFs = new Set(group.clients.map(c => c.cpf?.replace(/\D/g, '')).filter(Boolean));
       
       if (uniqueEmails.size === 1 && group.clients.length > 1) {
-        // Mesmo email = duplicado confirmado
         handleSelectGroup(group);
       } else if (uniqueCPFs.size === 1 && group.clients.length > 1) {
-        // Mesmo CPF = duplicado confirmado
         handleSelectGroup(group);
       }
     } catch (error) {
@@ -225,6 +223,10 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleMarkAsNotDuplicate = (groupIndex) => {
+    setNotDuplicateGroups(prev => new Set([...prev, groupIndex]));
   };
 
   const handleFieldChange = (field, value) => {
@@ -329,7 +331,7 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
             </DialogTitle>
           </DialogHeader>
 
-          {duplicateGroups.length === 0 ? (
+          {duplicateGroups.filter((_, idx) => !notDuplicateGroups.has(idx)).length === 0 ? (
             <div className="text-center py-12">
               <CheckCircle2 className="w-16 h-16 mx-auto mb-4 text-green-500" />
               <p className="text-lg font-medium text-slate-700">Nenhum duplicado encontrado!</p>
@@ -337,7 +339,9 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
             </div>
           ) : (
             <div className="space-y-4">
-              {duplicateGroups.map((group, idx) => (
+              {duplicateGroups.map((group, idx) => {
+                if (notDuplicateGroups.has(idx)) return null;
+                return (
                 <Card key={idx} className="border-amber-200 bg-amber-50/50">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
@@ -378,6 +382,15 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                           <Merge className="w-4 h-4 mr-2" />
                           Revisar
                         </Button>
+                        <Button 
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleMarkAsNotDuplicate(idx)}
+                          className="border-slate-300 text-slate-600 hover:bg-slate-50"
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Não é Duplicado
+                        </Button>
                       </div>
                     </div>
                   </CardHeader>
@@ -404,7 +417,8 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              );
+              })}
             </div>
           )}
         </DialogContent>
