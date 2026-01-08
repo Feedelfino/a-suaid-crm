@@ -63,6 +63,7 @@ export default function Renewals() {
     const certsWithoutClient = [];
     const certsRenovados = [];
 
+    // 1️⃣ Processar certificados da entidade Certificate
     allCertificates.forEach(cert => {
       // Análise: certificados sem client_id
       if (!cert.client_id) {
@@ -105,14 +106,42 @@ export default function Renewals() {
 
     console.log(`❌ Certificados SEM client_id: ${certsWithoutClient.length}`);
     console.log(`✅ Certificados JÁ renovados (ignorados): ${certsRenovados.length}`);
-    console.log(`📊 Certificados ATIVOS após consolidação: ${certsByClient.size}`);
+    console.log(`📊 Certificados ATIVOS da entidade Certificate: ${certsByClient.size}`);
+
+    // 2️⃣ Processar clientes com certificados no cadastro (has_certificate = true)
+    let clientsWithCertInProfile = 0;
+    allClients.forEach(client => {
+      // Pular se já tem certificado na entidade Certificate
+      if (certsByClient.has(client.id)) return;
+      
+      // Verificar se o cliente tem certificado no cadastro
+      if (client.has_certificate && client.certificate_expiry_date && client.certificate_type) {
+        clientsWithCertInProfile++;
+        
+        // Criar objeto similar ao Certificate para compatibilidade
+        certsByClient.set(client.id, {
+          id: `client_cert_${client.id}`,
+          client_id: client.id,
+          client_name: client.client_name,
+          client_email: client.email,
+          client_phone: client.phone || client.whatsapp,
+          certificate_type: client.certificate_type,
+          expiry_date: client.certificate_expiry_date,
+          renewal_status: client.renewal_status || 'pendente',
+          assigned_agent: client.assigned_agent,
+          source: 'client_profile' // Marcador para identificar origem
+        });
+      }
+    });
+
+    console.log(`📋 Certificados no cadastro de clientes: ${clientsWithCertInProfile}`);
+    console.log(`📊 TOTAL de certificados após consolidação: ${certsByClient.size}`);
 
     // Verificar clientes sem certificado
     const clientsWithCerts = new Set(Array.from(certsByClient.keys()));
-    const clientsInDB = new Set(allClients.map(c => c.id));
     const clientsWithoutCerts = allClients.filter(c => !clientsWithCerts.has(c.id));
     
-    console.log(`👥 Clientes COM certificados ativos: ${clientsWithCerts.size}`);
+    console.log(`👥 Clientes COM certificados: ${clientsWithCerts.size}`);
     console.log(`👥 Clientes SEM certificados: ${clientsWithoutCerts.length}`);
     
     // Enriquecer com dados do cliente
@@ -258,18 +287,40 @@ export default function Renewals() {
 
   // Mutation para atualizar status
   const updateStatusMutation = useMutation({
-    mutationFn: ({ certId, status }) => 
-      base44.entities.Certificate.update(certId, { renewal_status: status }),
+    mutationFn: async ({ certId, status, clientId, source }) => {
+      if (source === 'client_profile') {
+        // Atualizar no cadastro do cliente
+        await base44.entities.Client.update(clientId, { renewal_status: status });
+      } else {
+        // Atualizar na entidade Certificate
+        await base44.entities.Certificate.update(certId, { renewal_status: status });
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(['certificates']);
+      queryClient.invalidateQueries(['clients']);
     },
   });
 
   // Mutation para deletar certificado
   const deleteCertificateMutation = useMutation({
-    mutationFn: (certId) => base44.entities.Certificate.delete(certId),
+    mutationFn: async ({ certId, clientId, source }) => {
+      if (source === 'client_profile') {
+        // Remover certificado do cadastro do cliente
+        await base44.entities.Client.update(clientId, {
+          has_certificate: false,
+          certificate_type: null,
+          certificate_expiry_date: null,
+          renewal_status: null
+        });
+      } else {
+        // Deletar da entidade Certificate
+        await base44.entities.Certificate.delete(certId);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(['certificates']);
+      queryClient.invalidateQueries(['clients']);
     },
   });
 
@@ -310,9 +361,9 @@ export default function Renewals() {
     return colors[status] || 'bg-slate-100 text-slate-700';
   };
 
-  const handleDeleteCertificate = (certId, clientName) => {
+  const handleDeleteCertificate = (certId, clientId, source, clientName) => {
     if (confirm(`Confirma a exclusão do certificado de ${clientName}? Esta ação não pode ser desfeita.`)) {
-      deleteCertificateMutation.mutate(certId);
+      deleteCertificateMutation.mutate({ certId, clientId, source });
     }
   };
 
@@ -644,7 +695,12 @@ export default function Renewals() {
                       <TableCell>
                         <Select
                           value={renewal.renewal_status || 'pendente'}
-                          onValueChange={(value) => updateStatusMutation.mutate({ certId: renewal.id, status: value })}
+                          onValueChange={(value) => updateStatusMutation.mutate({ 
+                            certId: renewal.id, 
+                            clientId: renewal.client_id,
+                            source: renewal.source,
+                            status: value 
+                          })}
                         >
                           <SelectTrigger className={`w-36 ${getStatusColor(renewal.renewal_status)}`}>
                             <SelectValue />
@@ -670,7 +726,7 @@ export default function Renewals() {
                           <Button 
                             variant="ghost" 
                             size="icon"
-                            onClick={() => handleDeleteCertificate(renewal.id, renewal.client_name)}
+                            onClick={() => handleDeleteCertificate(renewal.id, renewal.client_id, renewal.source, renewal.client_name)}
                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           >
                             <Trash2 className="w-4 h-4" />
