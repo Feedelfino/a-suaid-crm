@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { 
   AlertTriangle, Users, Merge, X, Check, 
   Phone, Mail, Building2, User, CheckCircle2,
-  ArrowRight
+  ArrowRight, FileSearch, Edit3
 } from 'lucide-react';
 import {
   Dialog,
@@ -17,12 +17,18 @@ import {
 } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function DuplicateManager({ clients, open, onOpenChange }) {
   const queryClient = useQueryClient();
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [primaryClientId, setPrimaryClientId] = useState(null);
   const [selectedClientsInGroup, setSelectedClientsInGroup] = useState([]);
+  const [analyzedGroups, setAnalyzedGroups] = useState(new Set());
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editedData, setEditedData] = useState({});
 
   // Função para calcular similaridade entre strings
   const calculateSimilarity = (str1, str2) => {
@@ -191,6 +197,52 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
     setSelectedGroup(group);
     setPrimaryClientId(group.clients[0].id);
     setSelectedClientsInGroup(group.clients.map(c => c.id));
+    setEditMode(false);
+    setEditedData({});
+  };
+
+  const handleAnalyzeGroup = async (group, groupIndex) => {
+    setIsAnalyzing(true);
+    try {
+      // Simular análise (pode adicionar lógica de IA aqui)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setAnalyzedGroups(prev => new Set([...prev, groupIndex]));
+      
+      // Marcar automaticamente duplicados óbvios
+      const uniqueEmails = new Set(group.clients.map(c => c.email).filter(Boolean));
+      const uniqueCPFs = new Set(group.clients.map(c => c.cpf?.replace(/\D/g, '')).filter(Boolean));
+      
+      if (uniqueEmails.size === 1 && group.clients.length > 1) {
+        // Mesmo email = duplicado confirmado
+        handleSelectGroup(group);
+      } else if (uniqueCPFs.size === 1 && group.clients.length > 1) {
+        // Mesmo CPF = duplicado confirmado
+        handleSelectGroup(group);
+      }
+    } catch (error) {
+      console.error('Erro ao analisar:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleFieldChange = (field, value) => {
+    setEditedData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleApplyBulkEdit = async () => {
+    if (!primaryClientId || Object.keys(editedData).length === 0) return;
+
+    try {
+      await base44.entities.Client.update(primaryClientId, editedData);
+      queryClient.invalidateQueries(['clients']);
+      setEditMode(false);
+      setEditedData({});
+      alert('Dados atualizados com sucesso!');
+    } catch (error) {
+      alert('Erro ao atualizar dados: ' + error.message);
+    }
   };
 
   const toggleClientSelection = (clientId) => {
@@ -303,14 +355,30 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
                           ).join(', ')}
                         </p>
                       </div>
-                      <Button 
-                        size="sm"
-                        onClick={() => handleSelectGroup(group)}
-                        className="bg-amber-600 hover:bg-amber-700"
-                      >
-                        <Merge className="w-4 h-4 mr-2" />
-                        Revisar
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleAnalyzeGroup(group, idx)}
+                          disabled={isAnalyzing}
+                          className={analyzedGroups.has(idx) ? 'border-green-500 text-green-700' : ''}
+                        >
+                          {isAnalyzing ? (
+                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                          ) : (
+                            <FileSearch className="w-4 h-4 mr-2" />
+                          )}
+                          {analyzedGroups.has(idx) ? 'Analisado' : 'Analisar'}
+                        </Button>
+                        <Button 
+                          size="sm"
+                          onClick={() => handleSelectGroup(group)}
+                          className="bg-amber-600 hover:bg-amber-700"
+                        >
+                          <Merge className="w-4 h-4 mr-2" />
+                          Revisar
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -425,11 +493,97 @@ export default function DuplicateManager({ clients, open, onOpenChange }) {
               {/* Comparação de Campos */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">
-                    2. Compare os dados (cadastros não selecionados serão removidos)
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">
+                      2. Compare os dados (cadastros não selecionados serão removidos)
+                    </CardTitle>
+                    <Button 
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEditMode(!editMode)}
+                      className="gap-2"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                      {editMode ? 'Cancelar Edição' : 'Editar Dados'}
+                    </Button>
+                  </div>
                 </CardHeader>
-                <CardContent className="space-y-0">
+                <CardContent className="space-y-0">{editMode && (
+                    <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                      <p className="text-sm font-medium text-blue-900 mb-3">Editar dados do cadastro principal:</p>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs">Nome</Label>
+                          <Input
+                            value={editedData.client_name || selectedGroup.clients.find(c => c.id === primaryClientId)?.client_name || ''}
+                            onChange={(e) => handleFieldChange('client_name', e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Empresa</Label>
+                          <Input
+                            value={editedData.company_name || selectedGroup.clients.find(c => c.id === primaryClientId)?.company_name || ''}
+                            onChange={(e) => handleFieldChange('company_name', e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">CPF</Label>
+                          <Input
+                            value={editedData.cpf || selectedGroup.clients.find(c => c.id === primaryClientId)?.cpf || ''}
+                            onChange={(e) => handleFieldChange('cpf', e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">CNPJ</Label>
+                          <Input
+                            value={editedData.cnpj || selectedGroup.clients.find(c => c.id === primaryClientId)?.cnpj || ''}
+                            onChange={(e) => handleFieldChange('cnpj', e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">E-mail</Label>
+                          <Input
+                            type="email"
+                            value={editedData.email || selectedGroup.clients.find(c => c.id === primaryClientId)?.email || ''}
+                            onChange={(e) => handleFieldChange('email', e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Telefone</Label>
+                          <Input
+                            value={editedData.phone || selectedGroup.clients.find(c => c.id === primaryClientId)?.phone || ''}
+                            onChange={(e) => handleFieldChange('phone', e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <Label className="text-xs">Observações</Label>
+                          <Textarea
+                            value={editedData.notes || selectedGroup.clients.find(c => c.id === primaryClientId)?.notes || ''}
+                            onChange={(e) => handleFieldChange('notes', e.target.value)}
+                            className="mt-1"
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+                      
+                      <Button 
+                        size="sm" 
+                        onClick={handleApplyBulkEdit}
+                        disabled={Object.keys(editedData).length === 0}
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                      >
+                        <Check className="w-4 h-4 mr-2" />
+                        Aplicar Alterações
+                      </Button>
+                    </div>
+                  )}
                   <CompareField label="Código" clients={selectedGroup.clients.filter(c => selectedClientsInGroup.includes(c.id))} field="client_code" />
                   <CompareField label="Nome" clients={selectedGroup.clients.filter(c => selectedClientsInGroup.includes(c.id))} field="client_name" icon={User} />
                   <CompareField label="Empresa" clients={selectedGroup.clients.filter(c => selectedClientsInGroup.includes(c.id))} field="company_name" icon={Building2} />
