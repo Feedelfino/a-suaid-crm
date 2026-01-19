@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+import { formatInTimeZone } from 'date-fns-tz';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -122,6 +123,8 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading, clientI
     if ((formData.interaction_type === 'followup_agendado' || formData.tabulation === 'indeciso_agendado') && formData.followup_date) {
       try {
         const followupDate = new Date(formData.followup_date);
+        const saoPauloTime = formatInTimeZone(new Date(), 'America/Sao_Paulo', "yyyy-MM-dd'T'HH:mm:ssXXX");
+        
         await base44.entities.Appointment.create({
           client_id: clientId,
           client_name: clientName,
@@ -135,6 +138,7 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading, clientI
           meeting_reason: 'followup',
           status: 'aguardando',
           scheduled_by: user?.full_name,
+          created_date: saoPauloTime,
         });
 
         // Criar tarefa de follow-up
@@ -147,6 +151,7 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading, clientI
           agent_email: user?.email,
           due_date: formData.followup_date,
           status: 'pendente',
+          created_date: saoPauloTime,
         });
       } catch (err) {
         console.error('Erro ao criar agendamento:', err);
@@ -157,9 +162,11 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading, clientI
     const newFunnelStage = getFunnelStageFromInteraction(formData.interaction_type, formData.tabulation);
     if (newFunnelStage && clientId) {
       try {
+        const saoPauloTime = formatInTimeZone(new Date(), 'America/Sao_Paulo', "yyyy-MM-dd'T'HH:mm:ssXXX");
+        
         await base44.entities.Client.update(clientId, {
           funnel_stage: newFunnelStage,
-          funnel_updated_at: new Date().toISOString(),
+          funnel_updated_at: saoPauloTime,
         });
       } catch (err) {
         console.error('Erro ao atualizar funil:', err);
