@@ -4,6 +4,7 @@ import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { 
   ArrowLeft, Edit, Phone, Mail, Building2, Calendar,
   MessageSquare, CheckCircle, Clock, AlertTriangle,
@@ -231,7 +232,7 @@ export default function ClientDetails() {
                               )}
                             </div>
                             <span className="text-xs text-slate-400">
-                              {interaction.created_date && format(parseISO(interaction.created_date), "dd/MM/yyyy HH:mm")}
+                              {interaction.created_date && formatInTimeZone(parseISO(interaction.created_date), 'America/Sao_Paulo', "dd/MM/yyyy HH:mm")}
                             </span>
                           </div>
                           {interaction.notes && (
