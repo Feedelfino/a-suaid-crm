@@ -140,10 +140,16 @@ export default function Dashboard() {
   ).map(([name, value]) => ({ name: name.replace('_', ' '), value }));
 
   // Agent stats
-  const agentStats = displayAgentList.map(({ name: agent }) => {
-    const agentInteractions = monthInteractions.filter(i => i.agent_name === agent);
-    const agentAppointments = monthAppointments.filter(a => a.agent === agent);
-    const agentSales = agentInteractions.filter(i => i.tabulation === 'venda_feita');
+  const agentStats = displayAgentList.map(({ name: agent, email }) => {
+    const agentInteractions = monthInteractions.filter(i => 
+      i.agent_name === agent || i.agent_email === email || i.created_by === email
+    );
+    const agentAppointments = monthAppointments.filter(a => 
+      a.agent === agent || a.agent_email === email || a.scheduled_by_email === email
+    );
+    const agentSales = agentInteractions.filter(i => 
+      i.tabulation === 'venda_feita' || i.interaction_type === 'venda_fechada'
+    );
     
     return {
       agent,
