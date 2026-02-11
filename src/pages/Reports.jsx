@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { format, parseISO, startOfMonth, endOfMonth } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { 
-  FileText, Download, BarChart3, TrendingUp, Sparkles, Phone, Users, DollarSign
+  FileText, Download, BarChart3, TrendingUp, Sparkles, Phone, Users, DollarSign, PieChart, LineChart as LineChartIcon
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,10 +18,51 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  LineChart, Line, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  PieChart as RePieChart, Pie, Cell
+} from 'recharts';
 
 export default function Reports() {
   const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+
+  // Fetch raw data for charts
+  const { data: rawInteractions = [] } = useQuery({
+    queryKey: ['reports-raw-interactions', startDate, endDate],
+    queryFn: async () => {
+      const allInteractions = await base44.entities.Interaction.list('-created_date', 5000);
+      return allInteractions.filter(item => {
+        if (!item.created_date) return false;
+        const date = parseISO(item.created_date);
+        return isWithinInterval(date, { start: parseISO(startDate), end: parseISO(endDate) });
+      });
+    },
+  });
+
+  const { data: rawOffers = [] } = useQuery({
+    queryKey: ['reports-raw-offers', startDate, endDate],
+    queryFn: async () => {
+      const allOffers = await base44.entities.Offer.list('-created_date', 5000);
+      return allOffers.filter(item => {
+        if (!item.created_date) return false;
+        const date = parseISO(item.created_date);
+        return isWithinInterval(date, { start: parseISO(startDate), end: parseISO(endDate) });
+      });
+    },
+  });
+
+  const { data: rawDeals = [] } = useQuery({
+    queryKey: ['reports-raw-deals', startDate, endDate],
+    queryFn: async () => {
+      const allDeals = await base44.entities.Deal.list('-closed_at', 5000);
+      return allDeals.filter(item => {
+        if (!item.closed_at) return false;
+        const date = parseISO(item.closed_at);
+        return isWithinInterval(date, { start: parseISO(startDate), end: parseISO(endDate) });
+      });
+    },
+  });
 
   // Fetch overview data
   const { data: overview, isLoading: overviewLoading } = useQuery({
@@ -221,6 +262,112 @@ export default function Reports() {
                       </p>
                     </div>
                     <Sparkles className="w-12 h-12 text-indigo-500 opacity-50" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+              {/* Deals Won vs Lost Pie Chart */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <PieChart className="w-5 h-5 text-[#6B2D8B]" />
+                    Vendas Ganhas vs Perdidas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RePieChart>
+                        <Pie
+                          data={[
+                            { name: 'Ganhas', value: overview?.total_deals_won || 0, fill: '#22C55E' },
+                            { name: 'Perdidas', value: overview?.total_deals_lost || 0, fill: '#EF4444' },
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                        >
+                          <Cell key={`cell-0`} fill={'#22C55E'} />
+                          <Cell key={`cell-1`} fill={'#EF4444'} />
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </RePieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Daily Sales Trend Line Chart */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <LineChartIcon className="w-5 h-5 text-[#6B2D8B]" />
+                    Evolução Diária
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={(() => {
+                          const dailyData = {};
+                          const currentStart = parseISO(startDate);
+                          const currentEnd = parseISO(endDate);
+                          
+                          let currentDate = new Date(currentStart);
+                          while (currentDate <= currentEnd) {
+                            const dateKey = format(currentDate, 'yyyy-MM-dd');
+                            dailyData[dateKey] = {
+                              date: format(currentDate, 'dd/MM'),
+                              interactions: 0,
+                              offers: 0,
+                              dealsWon: 0,
+                            };
+                            currentDate.setDate(currentDate.getDate() + 1);
+                          }
+
+                          rawInteractions.forEach(i => {
+                            const dateKey = format(parseISO(i.created_date), 'yyyy-MM-dd');
+                            if (dailyData[dateKey]) {
+                              dailyData[dateKey].interactions++;
+                            }
+                          });
+
+                          rawOffers.forEach(o => {
+                            const dateKey = format(parseISO(o.created_date), 'yyyy-MM-dd');
+                            if (dailyData[dateKey]) {
+                              dailyData[dateKey].offers++;
+                            }
+                          });
+
+                          rawDeals.filter(d => d.status === 'won').forEach(d => {
+                            const dateKey = format(parseISO(d.closed_at), 'yyyy-MM-dd');
+                            if (dailyData[dateKey]) {
+                              dailyData[dateKey].dealsWon++;
+                            }
+                          });
+
+                          return Object.values(dailyData);
+                        })()}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="interactions" stroke="#6B2D8B" name="Interações" />
+                        <Line type="monotone" dataKey="offers" stroke="#C71585" name="Ofertas" />
+                        <Line type="monotone" dataKey="dealsWon" stroke="#22C55E" name="Vendas Ganhas" />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
                 </CardContent>
               </Card>
