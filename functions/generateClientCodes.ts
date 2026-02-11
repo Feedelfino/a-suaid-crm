@@ -33,11 +33,15 @@ Deno.serve(async (req) => {
 
     let nextNumber = existingCodes.length > 0 ? Math.max(...existingCodes) + 1 : 1;
 
-    // Atualizar cada cliente sem código
+    // Atualizar cada cliente sem código em lotes
     const updated = [];
-    for (const client of clientsWithoutCode) {
+    const BATCH_SIZE = 5;
+    const DELAY_MS = 1000;
+
+    for (let i = 0; i < clientsWithoutCode.length; i++) {
+      const client = clientsWithoutCode[i];
       const newCode = `CLI-${String(nextNumber).padStart(4, '0')}`;
-      
+
       await base44.asServiceRole.entities.Client.update(client.id, {
         client_code: newCode
       });
@@ -49,6 +53,11 @@ Deno.serve(async (req) => {
       });
 
       nextNumber++;
+
+      // Delay a cada lote para evitar rate limit
+      if ((i + 1) % BATCH_SIZE === 0 && i < clientsWithoutCode.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+      }
     }
 
     return Response.json({
