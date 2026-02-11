@@ -42,41 +42,36 @@ Deno.serve(async (req) => {
         }
 
         if (action === 'add') {
-            // Verificar se já existe pelo nome ou CPF/CNPJ para evitar duplicatas
             const existingClients = await base44.asServiceRole.entities.Client.filter({
                 client_name
             });
 
-            if (existingClients.length === 0) {
-                const created = await base44.asServiceRole.entities.Client.create({
-                    client_code: client_code || undefined,
-                    client_name: client_name,
-                    company_name: company_name || '',
-                    cpf: cpf || '',
-                    cnpj: cnpj || '',
-                    email: email || '',
-                    phone: phone || '',
-                    whatsapp: whatsapp || '',
-                    address: address || '',
-                    business_area: business_area || '',
-                    lead_status: lead_status || 'novo',
-                    lead_source: lead_source || 'outro',
-                    assigned_agent: assigned_agent || '',
-                });
+            const data = {
+                client_code: client_code || undefined,
+                client_name: client_name,
+                company_name: company_name || '',
+                cpf: cpf || '',
+                cnpj: cnpj || '',
+                email: email || '',
+                phone: phone || '',
+                whatsapp: whatsapp || '',
+                address: address || '',
+                business_area: business_area || '',
+                lead_status: lead_status || 'novo',
+                lead_source: lead_source || 'outro',
+                assigned_agent: assigned_agent || '',
+            };
 
-                return Response.json({
-                    success: true,
-                    action: "add",
-                    id: created.id
-                });
+            // Se já existir, ATUALIZA e devolve o id
+            if (existingClients.length > 0) {
+                const existingId = existingClients[0].id;
+                await base44.asServiceRole.entities.Client.update(existingId, data);
+                return Response.json({ success: true, action: "upsert", id: existingId });
             }
 
-            return Response.json({
-                success: true,
-                action: "add",
-                message: "Cliente já existe",
-                duplicate: true
-            });
+            // Se não existir, CRIA e devolve o id
+            const created = await base44.asServiceRole.entities.Client.create(data);
+            return Response.json({ success: true, action: "add", id: created.id });
         } else if (action === 'edit' && id) {
             // Atualizar cliente existente
             try {
