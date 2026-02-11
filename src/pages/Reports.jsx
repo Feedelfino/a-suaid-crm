@@ -127,17 +127,34 @@ export default function Reports() {
     conversionRate: data.offered > 0 ? ((data.sold / data.offered) * 100).toFixed(1) : 0,
   }));
 
-  const exportToCSV = (data, filename) => {
-    const headers = Object.keys(data[0] || {}).join(',');
-    const rows = data.map(row => Object.values(row).join(','));
-    const csv = [headers, ...rows].join('\n');
-    
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${filename}_${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    a.click();
+  const [exporting, setExporting] = useState(false);
+
+  const exportToSheets = async (data, title) => {
+    if (data.length === 0) {
+      alert('Nenhum dado para exportar');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const headers = Object.keys(data[0]);
+      
+      const response = await base44.functions.invoke('exportReportToSheets', {
+        data,
+        headers,
+        title: `${title} - ${format(new Date(), 'dd/MM/yyyy')}`,
+      });
+
+      if (response.data.success) {
+        window.open(response.data.url, '_blank');
+      } else {
+        alert('Erro ao exportar: ' + (response.data.error || 'Erro desconhecido'));
+      }
+    } catch (error) {
+      alert('Erro ao exportar: ' + error.message);
+    } finally {
+      setExporting(false);
+    }
   };
 
   const totalSales = salesData.reduce((sum, s) => sum + (s.sale_value || 0), 0);
@@ -234,16 +251,17 @@ export default function Reports() {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => exportToCSV(salesData.map(s => ({
+                onClick={() => exportToSheets(salesData.map(s => ({
                   Cliente: s.client_name,
                   Produto: s.product_offered,
                   Valor: s.sale_value,
                   Data: s.created_date,
                   Agente: s.agent_name,
-                })), 'vendas')}
+                })), 'Relatório de Vendas')}
+                disabled={exporting}
               >
                 <Download className="w-4 h-4 mr-2" />
-                Exportar CSV
+                {exporting ? 'Exportando...' : 'Exportar Google Sheets'}
               </Button>
             </CardHeader>
             <CardContent>
@@ -285,10 +303,11 @@ export default function Reports() {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => exportToCSV(agentData, 'desempenho_agentes')}
+                onClick={() => exportToSheets(agentData, 'Desempenho por Agente')}
+                disabled={exporting}
               >
                 <Download className="w-4 h-4 mr-2" />
-                Exportar CSV
+                {exporting ? 'Exportando...' : 'Exportar Google Sheets'}
               </Button>
             </CardHeader>
             <CardContent>
@@ -327,10 +346,11 @@ export default function Reports() {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => exportToCSV(productData, 'desempenho_produtos')}
+                onClick={() => exportToSheets(productData, 'Desempenho por Produto')}
+                disabled={exporting}
               >
                 <Download className="w-4 h-4 mr-2" />
-                Exportar CSV
+                {exporting ? 'Exportando...' : 'Exportar Google Sheets'}
               </Button>
             </CardHeader>
             <CardContent>
@@ -370,17 +390,18 @@ export default function Reports() {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => exportToCSV(campaigns.map(c => ({
+                onClick={() => exportToSheets(campaigns.map(c => ({
                   Nome: c.name,
                   Status: c.status,
                   Meta: c.goal,
                   Alcancado: c.achieved_value,
                   Inicio: c.start_date,
                   Fim: c.end_date,
-                })), 'campanhas')}
+                })), 'Relatório de Campanhas')}
+                disabled={exporting}
               >
                 <Download className="w-4 h-4 mr-2" />
-                Exportar CSV
+                {exporting ? 'Exportando...' : 'Exportar Google Sheets'}
               </Button>
             </CardHeader>
             <CardContent>
