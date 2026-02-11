@@ -59,6 +59,7 @@ import ClientForm from './pages/ClientForm';
 import Clients from './pages/Clients';
 import Dashboard from './pages/Dashboard';
 import DataImport from './pages/DataImport';
+import GoogleSheetsSync from './pages/GoogleSheetsSync';
 import HelpCenter from './pages/HelpCenter';
 import Home from './pages/Home';
 import Interactions from './pages/Interactions';
@@ -70,7 +71,6 @@ import Reports from './pages/Reports';
 import SalesPipeline from './pages/SalesPipeline';
 import Schedule from './pages/Schedule';
 import Tasks from './pages/Tasks';
-import GoogleSheetsSync from './pages/GoogleSheetsSync';
 import __Layout from './Layout.jsx';
 
 
@@ -87,6 +87,7 @@ export const PAGES = {
     "Clients": Clients,
     "Dashboard": Dashboard,
     "DataImport": DataImport,
+    "GoogleSheetsSync": GoogleSheetsSync,
     "HelpCenter": HelpCenter,
     "Home": Home,
     "Interactions": Interactions,
@@ -98,7 +99,6 @@ export const PAGES = {
     "SalesPipeline": SalesPipeline,
     "Schedule": Schedule,
     "Tasks": Tasks,
-    "GoogleSheetsSync": GoogleSheetsSync,
 }
 
 export const pagesConfig = {
