@@ -171,10 +171,13 @@ export default function Layout({ children, currentPageName }) {
     { name: 'Banco de Dados', icon: Database, page: 'DataImport' },
     { name: 'Notas', icon: StickyNote, page: 'Notes' },
     { name: 'Chat', icon: MessageSquare, page: 'Chat' },
-        { name: 'Central de Ajuda', icon: BookOpen, page: 'HelpCenter' },
-        // Admin menu only visible to admins
-        ...(isAdmin ? [{ name: 'Administração', icon: Settings, page: 'Admin' }] : []),
-      ];
+    { name: 'Central de Ajuda', icon: BookOpen, page: 'HelpCenter' },
+    // Admin menu only visible to admins
+    ...(isAdmin ? [
+      { name: 'Google Sheets', icon: FileSpreadsheet, page: 'GoogleSheetsSync' },
+      { name: 'Administração', icon: Settings, page: 'Admin' }
+    ] : []),
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
