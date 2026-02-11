@@ -25,7 +25,6 @@ import { checkAndCreateNotifications } from '@/components/notifications/Notifica
 import SmartAlerts from '@/components/notifications/SmartAlerts';
 import GoalsSummary from '@/components/home/GoalsSummary';
 import RenewalBlock from '@/components/home/RenewalBlock';
-import SheetsExportButton from '@/components/sheets/SheetsExportButton';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -202,11 +201,6 @@ export default function Home() {
 
       {/* Smart Alerts */}
       <SmartAlerts userEmail={user?.email} />
-
-      {/* Sheets Export - Admin Only */}
-      {user?.role === 'admin' && (
-        <SheetsExportButton />
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Today's Tasks */}
