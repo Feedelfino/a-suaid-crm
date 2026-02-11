@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { 
   Settings, Users, Package, Target, Plus, Edit, Trash2, 
-  Shield, CheckCircle, XCircle, UserCog, Save, AtSign
+  Shield, CheckCircle, XCircle, UserCog, Save, AtSign, Hash
 } from 'lucide-react';
 import NicknameEditor from '@/components/admin/NicknameEditor';
 import CategoryManager from '@/components/admin/CategoryManager';
@@ -45,6 +45,7 @@ export default function Admin() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('access');
   const [user, setUser] = useState(null);
+  const [generatingCodes, setGeneratingCodes] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -281,6 +282,27 @@ export default function Admin() {
     outro: 'Outro',
   };
 
+  const handleGenerateClientCodes = async () => {
+    if (!confirm('Deseja gerar códigos para todos os clientes que não possuem um? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    setGeneratingCodes(true);
+    try {
+      const response = await base44.functions.invoke('generateClientCodes', {});
+      if (response.data.success) {
+        alert(`✅ ${response.data.message}\n\n${response.data.updated} clientes foram atualizados.`);
+        queryClient.invalidateQueries(['admin-clients']);
+      } else {
+        alert('❌ Erro ao gerar códigos: ' + (response.data.error || 'Erro desconhecido'));
+      }
+    } catch (error) {
+      alert('❌ Erro ao gerar códigos: ' + error.message);
+    } finally {
+      setGeneratingCodes(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -310,6 +332,10 @@ export default function Admin() {
           <TabsTrigger value="goals" className="flex items-center gap-2">
             <Target className="w-4 h-4" />
             Metas
+          </TabsTrigger>
+          <TabsTrigger value="utilities" className="flex items-center gap-2">
+            <Settings className="w-4 h-4" />
+            Utilitários
           </TabsTrigger>
         </TabsList>
 
@@ -779,6 +805,51 @@ export default function Admin() {
         {/* Goals Tab */}
         <TabsContent value="goals" className="mt-6">
           <GoalManager />
+        </TabsContent>
+
+        {/* Utilities Tab */}
+        <TabsContent value="utilities" className="mt-6">
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-[#6B2D8B]" />
+                Utilitários do Sistema
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 bg-slate-50 rounded-xl border">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#6B2D8B] to-[#C71585] flex items-center justify-center shrink-0">
+                    <Hash className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-slate-800 mb-1">Gerar Códigos de Clientes</h3>
+                    <p className="text-sm text-slate-600 mb-4">
+                      Esta ferramenta irá criar códigos únicos (CLI-0001, CLI-0002, etc.) para todos os clientes que não possuem um código.
+                      Útil após importações de planilhas.
+                    </p>
+                    <Button
+                      onClick={handleGenerateClientCodes}
+                      disabled={generatingCodes}
+                      className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]"
+                    >
+                      {generatingCodes ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                          Gerando...
+                        </>
+                      ) : (
+                        <>
+                          <Hash className="w-4 h-4 mr-2" />
+                          Gerar Códigos
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
