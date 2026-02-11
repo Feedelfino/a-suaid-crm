@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
             });
 
             if (existingClients.length === 0) {
-                await base44.asServiceRole.entities.Client.create({
+                const created = await base44.asServiceRole.entities.Client.create({
                     client_code: client_code || undefined,
                     client_name: client_name,
                     company_name: company_name || '',
@@ -63,7 +63,20 @@ Deno.serve(async (req) => {
                     lead_source: lead_source || 'outro',
                     assigned_agent: assigned_agent || '',
                 });
+
+                return Response.json({
+                    success: true,
+                    action: "add",
+                    id: created.id
+                });
             }
+
+            return Response.json({
+                success: true,
+                action: "add",
+                message: "Cliente já existe",
+                duplicate: true
+            });
         } else if (action === 'edit' && id) {
             // Atualizar cliente existente
             try {
