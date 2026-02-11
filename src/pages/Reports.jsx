@@ -5,7 +5,7 @@ import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'da
 import { ptBR } from 'date-fns/locale';
 import { 
   FileText, Download, Filter, Calendar, Users, 
-  DollarSign, BarChart3, TrendingUp, Sparkles
+  DollarSign, BarChart3, TrendingUp, Sparkles, Phone
 } from 'lucide-react';
 import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -157,6 +157,26 @@ export default function Reports() {
     }
   };
 
+  // Aggregate interaction data by contact method
+  const interactionSummary = filteredInteractions.reduce((acc, interaction) => {
+    const method = interaction.contact_method || 'não_especificado';
+    if (!acc[method]) {
+      acc[method] = { total: 0, success: 0 };
+    }
+    acc[method].total++;
+    if (interaction.interaction_type === 'contato_sucesso') {
+      acc[method].success++;
+    }
+    return acc;
+  }, {});
+
+  const interactionSummaryData = Object.entries(interactionSummary).map(([method, data]) => ({
+    method,
+    total: data.total,
+    success: data.success,
+    successRate: data.total > 0 ? ((data.success / data.total) * 100).toFixed(1) : 0,
+  })).sort((a, b) => b.total - a.total);
+
   const totalSales = salesData.reduce((sum, s) => sum + (s.sale_value || 0), 0);
   const periodLabel = `${format(parseISO(startDate), 'dd/MM/yyyy')} - ${format(parseISO(endDate), 'dd/MM/yyyy')}`;
 
@@ -222,6 +242,10 @@ export default function Reports() {
           <TabsTrigger value="agents">Por Agente</TabsTrigger>
           <TabsTrigger value="products">Por Produto</TabsTrigger>
           <TabsTrigger value="campaigns">Campanhas</TabsTrigger>
+          <TabsTrigger value="interactions" className="gap-2">
+            <Phone className="w-4 h-4" />
+            Interações
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-6">
@@ -436,6 +460,107 @@ export default function Reports() {
               </Table>
               {campaigns.length === 0 && (
                 <p className="text-center py-8 text-slate-500">Nenhuma campanha cadastrada</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="interactions" className="mt-6">
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Relatório de Interações por Método de Contato</CardTitle>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => exportToSheets(interactionSummaryData.map(d => ({
+                  'Método de Contato': d.method.replace(/_/g, ' '),
+                  'Total de Interações': d.total,
+                  'Contatos com Sucesso': d.success,
+                  'Taxa de Sucesso (%)': d.successRate,
+                })), 'Relatório de Interações')}
+                disabled={exporting}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {exporting ? 'Exportando...' : 'Exportar Google Sheets'}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-blue-600 font-medium">Total de Interações</p>
+                        <p className="text-2xl font-bold text-blue-900">{filteredInteractions.length}</p>
+                      </div>
+                      <Phone className="w-10 h-10 text-blue-500 opacity-50" />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-green-600 font-medium">Contatos com Sucesso</p>
+                        <p className="text-2xl font-bold text-green-900">
+                          {filteredInteractions.filter(i => i.interaction_type === 'contato_sucesso').length}
+                        </p>
+                      </div>
+                      <TrendingUp className="w-10 h-10 text-green-500 opacity-50" />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-purple-600 font-medium">Taxa Geral de Sucesso</p>
+                        <p className="text-2xl font-bold text-purple-900">
+                          {filteredInteractions.length > 0 
+                            ? ((filteredInteractions.filter(i => i.interaction_type === 'contato_sucesso').length / filteredInteractions.length) * 100).toFixed(1)
+                            : 0}%
+                        </p>
+                      </div>
+                      <BarChart3 className="w-10 h-10 text-purple-500 opacity-50" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Método de Contato</TableHead>
+                    <TableHead>Total de Interações</TableHead>
+                    <TableHead>Contatos com Sucesso</TableHead>
+                    <TableHead>Taxa de Sucesso</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {interactionSummaryData.map((data) => (
+                    <TableRow key={data.method}>
+                      <TableCell className="font-medium capitalize">
+                        {data.method.replace(/_/g, ' ')}
+                      </TableCell>
+                      <TableCell>{data.total}</TableCell>
+                      <TableCell>{data.success}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-slate-200 rounded-full h-2 max-w-[100px]">
+                            <div 
+                              className="bg-green-500 h-2 rounded-full transition-all"
+                              style={{ width: `${data.successRate}%` }}
+                            />
+                          </div>
+                          <span className="font-semibold">{data.successRate}%</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {interactionSummaryData.length === 0 && (
+                <p className="text-center py-8 text-slate-500">Nenhum dado de interação no período</p>
               )}
             </CardContent>
           </Card>
