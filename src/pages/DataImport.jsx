@@ -478,12 +478,37 @@ export default function DataImport() {
           <h1 className="text-2xl font-bold text-slate-800">Banco de Dados</h1>
           <p className="text-slate-500">Importe e limpe dados de planilhas e PDFs</p>
         </div>
-        {showEditor && (
-          <Button variant="outline" onClick={resetUpload}>
-            <X className="w-4 h-4 mr-2" />
-            Nova Importação
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="outline" 
+            onClick={async () => {
+              try {
+                const response = await base44.functions.invoke('exportDatabase');
+                const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `export_banco_dados_${new Date().toISOString().split('T')[0]}.csv`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+              } catch (error) {
+                console.error('Erro ao exportar:', error);
+              }
+            }}
+            className="border-green-600 text-green-600 hover:bg-green-50"
+          >
+            <HardDrive className="w-4 h-4 mr-2" />
+            Exportar Banco de Dados
           </Button>
-        )}
+          {showEditor && (
+            <Button variant="outline" onClick={resetUpload}>
+              <X className="w-4 h-4 mr-2" />
+              Nova Importação
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Status Messages */}
