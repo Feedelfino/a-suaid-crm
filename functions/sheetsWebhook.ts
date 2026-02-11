@@ -3,6 +3,15 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
+
+        // Verificar token de segurança
+        const providedToken = req.headers.get('Authorization')?.replace('Bearer ', '') || new URL(req.url).searchParams.get('token');
+        const expectedToken = Deno.env.get("SHEETS_WEBHOOK_SECRET");
+
+        if (!providedToken || providedToken !== expectedToken) {
+            return Response.json({ error: 'Unauthorized: Invalid or missing token' }, { status: 401 });
+        }
+
         const payload = await req.json();
 
         // Validar payload do Google Apps Script
