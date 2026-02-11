@@ -24,7 +24,8 @@ import {
         StickyNote,
         MessageSquare,
         RefreshCw,
-        BookOpen
+        BookOpen,
+        FileSpreadsheet
       } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
