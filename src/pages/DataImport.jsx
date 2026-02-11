@@ -21,6 +21,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import DataCleaningEditor from '@/components/data/DataCleaningEditor';
+import SheetsExportButton from '@/components/sheets/SheetsExportButton';
 import { Download } from 'lucide-react';
 
 // Formatos suportados com detalhes
@@ -548,6 +549,9 @@ export default function DataImport() {
           </AlertDescription>
         </Alert>
       )}
+
+      {/* Sheets Export Button */}
+      <SheetsExportButton />
 
       {/* Upload Area */}
       {!showEditor && (
