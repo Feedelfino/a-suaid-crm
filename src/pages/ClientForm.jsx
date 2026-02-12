@@ -43,6 +43,9 @@ export default function ClientForm() {
     service_type: '',
     service_expiry_date: '',
     renewal_status: '',
+    instagram: '',
+    linkedin: '',
+    website: '',
   });
 
   // Gerar código único se for novo cliente
@@ -91,6 +94,9 @@ export default function ClientForm() {
         service_type: client.service_type || '',
         service_expiry_date: client.service_expiry_date || '',
         renewal_status: client.renewal_status || '',
+        instagram: client.instagram || '',
+        linkedin: client.linkedin || '',
+        website: client.website || '',
       });
     }
   }, [client]);
@@ -254,7 +260,7 @@ export default function ClientForm() {
                   placeholder="(00) 00000-0000"
                 />
               </div>
-              <div className="space-y-2 md:col-span-2">
+              <div className="space-y-2">
                 <Label htmlFor="email">E-mail</Label>
                 <Input
                   id="email"
@@ -262,6 +268,33 @@ export default function ClientForm() {
                   value={formData.email}
                   onChange={(e) => handleChange('email', e.target.value)}
                   placeholder="email@exemplo.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="instagram">Instagram</Label>
+                <Input
+                  id="instagram"
+                  value={formData.instagram}
+                  onChange={(e) => handleChange('instagram', e.target.value)}
+                  placeholder="@seuperfil ou link completo"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="linkedin">LinkedIn</Label>
+                <Input
+                  id="linkedin"
+                  value={formData.linkedin}
+                  onChange={(e) => handleChange('linkedin', e.target.value)}
+                  placeholder="URL do perfil"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="website">Site</Label>
+                <Input
+                  id="website"
+                  value={formData.website}
+                  onChange={(e) => handleChange('website', e.target.value)}
+                  placeholder="https://www.seusite.com"
                 />
               </div>
             </CardContent>
