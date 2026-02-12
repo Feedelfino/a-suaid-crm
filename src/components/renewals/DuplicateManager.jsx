@@ -179,6 +179,12 @@ export default function DuplicateManager() {
                                   <span className="font-medium">Agente:</span>{' '}
                                   {cert.assigned_agent || '-'}
                                 </div>
+                                <div className="col-span-2">
+                                  <span className="font-medium">Origem:</span>{' '}
+                                  <Badge variant="outline" className="ml-1 text-xs">
+                                    {cert.source === 'certificate_entity' ? 'Entidade Certificate' : 'Cadastro Cliente'}
+                                  </Badge>
+                                </div>
                               </div>
                             </div>
                           </div>
