@@ -71,6 +71,7 @@ import Reports from './pages/Reports';
 import SalesPipeline from './pages/SalesPipeline';
 import Schedule from './pages/Schedule';
 import Tasks from './pages/Tasks';
+import DatabaseCleaning from './pages/DatabaseCleaning';
 import __Layout from './Layout.jsx';
 
 
@@ -99,6 +100,7 @@ export const PAGES = {
     "SalesPipeline": SalesPipeline,
     "Schedule": Schedule,
     "Tasks": Tasks,
+    "DatabaseCleaning": DatabaseCleaning,
 }
 
 export const pagesConfig = {
