@@ -176,7 +176,8 @@ export default function Layout({ children, currentPageName }) {
     // Admin menu only visible to admins
     ...(isAdmin ? [
       { name: 'Google Sheets', icon: FileSpreadsheet, page: 'GoogleSheetsSync' },
-      { name: 'Administração', icon: Settings, page: 'Admin' }
+        { name: 'Limpeza de Dados', icon: Database, page: 'DatabaseCleaning' },
+        { name: 'Administração', icon: Settings, page: 'Admin' }
     ] : []),
   ];
 
