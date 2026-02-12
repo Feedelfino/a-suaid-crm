@@ -59,6 +59,7 @@ import ClientForm from './pages/ClientForm';
 import Clients from './pages/Clients';
 import Dashboard from './pages/Dashboard';
 import DataImport from './pages/DataImport';
+import DatabaseCleaning from './pages/DatabaseCleaning';
 import GoogleSheetsSync from './pages/GoogleSheetsSync';
 import HelpCenter from './pages/HelpCenter';
 import Home from './pages/Home';
@@ -71,7 +72,6 @@ import Reports from './pages/Reports';
 import SalesPipeline from './pages/SalesPipeline';
 import Schedule from './pages/Schedule';
 import Tasks from './pages/Tasks';
-import DatabaseCleaning from './pages/DatabaseCleaning';
 import __Layout from './Layout.jsx';
 
 
@@ -88,6 +88,7 @@ export const PAGES = {
     "Clients": Clients,
     "Dashboard": Dashboard,
     "DataImport": DataImport,
+    "DatabaseCleaning": DatabaseCleaning,
     "GoogleSheetsSync": GoogleSheetsSync,
     "HelpCenter": HelpCenter,
     "Home": Home,
@@ -100,7 +101,6 @@ export const PAGES = {
     "SalesPipeline": SalesPipeline,
     "Schedule": Schedule,
     "Tasks": Tasks,
-    "DatabaseCleaning": DatabaseCleaning,
 }
 
 export const pagesConfig = {
