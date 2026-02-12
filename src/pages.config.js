@@ -70,6 +70,7 @@ import Reports from './pages/Reports';
 import SalesPipeline from './pages/SalesPipeline';
 import Schedule from './pages/Schedule';
 import Tasks from './pages/Tasks';
+import CertificateRenewals from './pages/CertificateRenewals';
 import __Layout from './Layout.jsx';
 
 
@@ -97,6 +98,7 @@ export const PAGES = {
     "SalesPipeline": SalesPipeline,
     "Schedule": Schedule,
     "Tasks": Tasks,
+    "CertificateRenewals": CertificateRenewals,
 }
 
 export const pagesConfig = {
