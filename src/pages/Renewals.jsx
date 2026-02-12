@@ -37,6 +37,7 @@ export default function Renewals() {
   const [agentFilter, setAgentFilter] = useState('all');
   const [sortField, setSortField] = useState('expiry_date');
   const [sortOrder, setSortOrder] = useState('asc');
+  const [syncing, setSyncing] = useState(false);
 
   // Buscar certificados do banco (fonte única)
   const { data: allCertificates = [], isLoading } = useQuery({
@@ -367,6 +368,35 @@ export default function Renewals() {
     }
   };
 
+  const handleSyncCertificates = async () => {
+    if (!confirm('Deseja sincronizar todos os certificados com os dados atualizados dos clientes?')) {
+      return;
+    }
+
+    setSyncing(true);
+    try {
+      const response = await base44.functions.invoke('syncCertificatesWithClients');
+      
+      if (response.data.success) {
+        alert(
+          `Sincronização concluída!\n\n` +
+          `✓ ${response.data.summary.certificates_updated} certificados atualizados\n` +
+          `⚠️ ${response.data.summary.certificates_without_client} certificados sem cliente vinculado\n` +
+          `Total processado: ${response.data.summary.total_certificates} certificados`
+        );
+        
+        queryClient.invalidateQueries(['certificates']);
+        queryClient.invalidateQueries(['clients']);
+      } else {
+        alert('Erro ao sincronizar: ' + response.data.error);
+      }
+    } catch (error) {
+      alert('Erro ao sincronizar: ' + error.message);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -385,6 +415,14 @@ export default function Renewals() {
             Gestão estratégica de certificados • {dashboard.total} clientes únicos
           </p>
         </div>
+        <Button
+          onClick={handleSyncCertificates}
+          disabled={syncing}
+          className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]"
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+          {syncing ? 'Sincronizando...' : 'Sincronizar Dados'}
+        </Button>
       </div>
 
       {/* 📊 DASHBOARD COMERCIAL - Cards Clicáveis */}
