@@ -419,6 +419,34 @@ export default function Renewals() {
         <div className="flex gap-2">
           <DuplicateManager />
           <Button
+            onClick={async () => {
+              if (!confirm('Deseja vincular certificados órfãos a clientes existentes ou criar novos cadastros?')) return;
+              setSyncing(true);
+              try {
+                const response = await base44.functions.invoke('linkOrphanCertificates');
+                if (response.data.success) {
+                  alert(
+                    `Certificados órfãos processados!\n\n` +
+                    `✓ ${response.data.linked} vinculados a clientes existentes\n` +
+                    `✓ ${response.data.created} novos cadastros criados\n` +
+                    `Total órfãos encontrados: ${response.data.orphans}`
+                  );
+                  queryClient.invalidateQueries(['certificates']);
+                  queryClient.invalidateQueries(['clients']);
+                }
+              } catch (error) {
+                alert('Erro: ' + error.message);
+              } finally {
+                setSyncing(false);
+              }
+            }}
+            disabled={syncing}
+            variant="outline"
+          >
+            <Users className="w-4 h-4 mr-2" />
+            Vincular Órfãos
+          </Button>
+          <Button
             onClick={handleSyncCertificates}
             disabled={syncing}
             className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]"
