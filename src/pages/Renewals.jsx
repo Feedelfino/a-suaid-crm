@@ -27,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import DuplicateManager from '@/components/renewals/DuplicateManager';
 
 export default function Renewals() {
   const queryClient = useQueryClient();
@@ -415,14 +416,17 @@ export default function Renewals() {
             Gestão estratégica de certificados • {dashboard.total} clientes únicos
           </p>
         </div>
-        <Button
-          onClick={handleSyncCertificates}
-          disabled={syncing}
-          className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]"
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-          {syncing ? 'Sincronizando...' : 'Sincronizar Dados'}
-        </Button>
+        <div className="flex gap-2">
+          <DuplicateManager />
+          <Button
+            onClick={handleSyncCertificates}
+            disabled={syncing}
+            className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Sincronizando...' : 'Sincronizar Dados'}
+          </Button>
+        </div>
       </div>
 
       {/* 📊 DASHBOARD COMERCIAL - Cards Clicáveis */}
