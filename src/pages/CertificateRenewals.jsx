@@ -1,10 +1,21 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -35,8 +46,24 @@ import { toast } from 'sonner';
 
 export default function CertificateRenewals() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [renewalDialog, setRenewalDialog] = useState({ open: false, client: null });
+  const [renewalForm, setRenewalForm] = useState({
+    saleDate: format(new Date(), 'yyyy-MM-dd'),
+    validityMonths: '12',
+    value: ''
+  });
+  const [currentUser, setCurrentUser] = useState(null);
+
+  React.useEffect(() => {
+    const loadUser = async () => {
+      const user = await base44.auth.me();
+      setCurrentUser(user);
+    };
+    loadUser();
+  }, []);
 
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ['clients-with-certificates'],
@@ -44,6 +71,11 @@ export default function CertificateRenewals() {
       const allClients = await base44.entities.Client.filter({ has_certificate: true });
       return allClients.filter(c => c.certificate_expiry_date);
     },
+  });
+
+  const { data: products = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: () => base44.entities.Product.filter({ category: 'certificado_digital' }),
   });
 
   const updateClientMutation = useMutation({
@@ -99,19 +131,80 @@ export default function CertificateRenewals() {
     }
   };
 
-  const handleRenewalStatus = async (client, renewed) => {
-    const updates = {
-      renewal_status: renewed ? 'renovado' : 'nao_renovado',
-    };
+  const openRenewalDialog = (client) => {
+    setRenewalDialog({ open: true, client });
+    setRenewalForm({
+      saleDate: format(new Date(), 'yyyy-MM-dd'),
+      validityMonths: '12',
+      value: ''
+    });
+  };
 
-    // Se renovado, podemos atualizar a data de vencimento (adicionar 1 ano)
-    if (renewed && client.certificate_expiry_date) {
-      const currentExpiry = parseISO(client.certificate_expiry_date);
-      const newExpiry = addDays(currentExpiry, 365);
-      updates.certificate_expiry_date = format(newExpiry, 'yyyy-MM-dd');
+  const handleNotRenewed = async (client) => {
+    if (!currentUser) return;
+
+    try {
+      // Criar interação de não renovação
+      await base44.entities.Interaction.create({
+        client_id: client.id,
+        client_name: client.client_name,
+        type: 'followup',
+        channel: 'whatsapp',
+        outcome: 'sem_interesse',
+        notes: 'Cliente não renovou o certificado digital',
+        agent_email: currentUser.email
+      });
+
+      // Atualizar status do cliente
+      await base44.entities.Client.update(client.id, {
+        renewal_status: 'nao_renovado'
+      });
+
+      toast.success('Interação registrada');
+      queryClient.invalidateQueries(['clients-with-certificates']);
+      
+      // Redirecionar para interações
+      navigate(createPageUrl('Interactions'));
+    } catch (error) {
+      toast.error('Erro ao registrar');
     }
+  };
 
-    updateClientMutation.mutate({ clientId: client.id, data: updates });
+  const confirmRenewal = async () => {
+    const { client } = renewalDialog;
+    if (!client || !currentUser) return;
+
+    try {
+      const saleDate = parseISO(renewalForm.saleDate);
+      const validityMonths = parseInt(renewalForm.validityMonths);
+      
+      // Calcular nova data de vencimento
+      const newExpiryDate = addDays(saleDate, validityMonths * 30);
+
+      // Criar venda (Deal)
+      const product = products.find(p => p.category === 'certificado_digital');
+      await base44.entities.Deal.create({
+        client_id: client.id,
+        product_id: product?.id || '',
+        agent_email: currentUser.email,
+        value: parseFloat(renewalForm.value) || 0,
+        status: 'won',
+        closed_at: renewalForm.saleDate,
+        notes: `Renovação de certificado - Validade: ${validityMonths} meses`
+      });
+
+      // Atualizar cliente
+      await base44.entities.Client.update(client.id, {
+        renewal_status: 'renovado',
+        certificate_expiry_date: format(newExpiryDate, 'yyyy-MM-dd')
+      });
+
+      toast.success('Renovação registrada com sucesso!');
+      queryClient.invalidateQueries(['clients-with-certificates']);
+      setRenewalDialog({ open: false, client: null });
+    } catch (error) {
+      toast.error('Erro ao registrar renovação');
+    }
   };
 
   const filteredClients = clients.filter(client => {
@@ -325,7 +418,7 @@ export default function CertificateRenewals() {
                                 size="sm"
                                 variant="outline"
                                 className="text-green-600 hover:bg-green-50"
-                                onClick={() => handleRenewalStatus(client, true)}
+                                onClick={() => openRenewalDialog(client)}
                               >
                                 <CheckCircle2 className="w-4 h-4 mr-1" />
                                 Renovado
@@ -334,7 +427,7 @@ export default function CertificateRenewals() {
                                 size="sm"
                                 variant="outline"
                                 className="text-red-600 hover:bg-red-50"
-                                onClick={() => handleRenewalStatus(client, false)}
+                                onClick={() => handleNotRenewed(client)}
                               >
                                 <XCircle className="w-4 h-4 mr-1" />
                                 Não Renovado
@@ -351,6 +444,91 @@ export default function CertificateRenewals() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Renewal Dialog */}
+      <Dialog open={renewalDialog.open} onOpenChange={(open) => setRenewalDialog({ open, client: null })}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Registrar Renovação</DialogTitle>
+            <DialogDescription>
+              Cliente: {renewalDialog.client?.client_name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="saleDate">Data da Venda *</Label>
+              <Input
+                id="saleDate"
+                type="date"
+                value={renewalForm.saleDate}
+                onChange={(e) => setRenewalForm({ ...renewalForm, saleDate: e.target.value })}
+              />
+              <p className="text-xs text-slate-500">
+                Esta data será usada para calcular a próxima renovação
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="validity">Validade do Certificado *</Label>
+              <Select 
+                value={renewalForm.validityMonths} 
+                onValueChange={(value) => setRenewalForm({ ...renewalForm, validityMonths: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="12">12 meses (1 ano)</SelectItem>
+                  <SelectItem value="24">24 meses (2 anos)</SelectItem>
+                  <SelectItem value="36">36 meses (3 anos)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="value">Valor da Venda (R$) *</Label>
+              <Input
+                id="value"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={renewalForm.value}
+                onChange={(e) => setRenewalForm({ ...renewalForm, value: e.target.value })}
+              />
+            </div>
+
+            {renewalForm.saleDate && renewalForm.validityMonths && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-900 font-medium">
+                  Nova data de vencimento:
+                </p>
+                <p className="text-sm text-blue-700">
+                  {format(
+                    addDays(parseISO(renewalForm.saleDate), parseInt(renewalForm.validityMonths) * 30),
+                    "dd/MM/yyyy",
+                    { locale: ptBR }
+                  )}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenewalDialog({ open: false, client: null })}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={confirmRenewal}
+              disabled={!renewalForm.saleDate || !renewalForm.validityMonths || !renewalForm.value}
+              className="bg-gradient-to-r from-[#6B2D8B] to-[#C71585]"
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              Confirmar Renovação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

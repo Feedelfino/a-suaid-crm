@@ -53,6 +53,7 @@ import Admin from './pages/Admin';
 import AgentPerformance from './pages/AgentPerformance';
 import AppointmentForm from './pages/AppointmentForm';
 import Campaigns from './pages/Campaigns';
+import CertificateRenewals from './pages/CertificateRenewals';
 import Chat from './pages/Chat';
 import ClientDetails from './pages/ClientDetails';
 import ClientForm from './pages/ClientForm';
@@ -70,7 +71,6 @@ import Reports from './pages/Reports';
 import SalesPipeline from './pages/SalesPipeline';
 import Schedule from './pages/Schedule';
 import Tasks from './pages/Tasks';
-import CertificateRenewals from './pages/CertificateRenewals';
 import __Layout from './Layout.jsx';
 
 
@@ -81,6 +81,7 @@ export const PAGES = {
     "AgentPerformance": AgentPerformance,
     "AppointmentForm": AppointmentForm,
     "Campaigns": Campaigns,
+    "CertificateRenewals": CertificateRenewals,
     "Chat": Chat,
     "ClientDetails": ClientDetails,
     "ClientForm": ClientForm,
@@ -98,7 +99,6 @@ export const PAGES = {
     "SalesPipeline": SalesPipeline,
     "Schedule": Schedule,
     "Tasks": Tasks,
-    "CertificateRenewals": CertificateRenewals,
 }
 
 export const pagesConfig = {
