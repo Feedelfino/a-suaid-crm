@@ -5,6 +5,7 @@ import {
   Upload, FileSpreadsheet, CheckCircle, AlertCircle, Database, Loader2,
   FileText, Table as TableIcon, X, Eye, Info, HardDrive, AlertTriangle
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -480,6 +481,12 @@ export default function DataImport() {
           <p className="text-slate-500">Importe e limpe dados de planilhas e PDFs</p>
         </div>
         <div className="flex items-center gap-3">
+          <Link to={createPageUrl('DatabaseCleaning')}>
+            <Button variant="outline" className="border-[#6B2D8B] text-[#6B2D8B] hover:bg-[#6B2D8B]/5">
+              <Database className="w-4 h-4 mr-2" />
+              Limpeza de Dados
+            </Button>
+          </Link>
           <Button 
             variant="outline" 
             onClick={async () => {

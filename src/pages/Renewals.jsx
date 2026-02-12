@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import DuplicateManager from '@/components/renewals/DuplicateManager';
+
 
 export default function Renewals() {
   const queryClient = useQueryClient();
@@ -417,7 +417,6 @@ export default function Renewals() {
           </p>
         </div>
         <div className="flex gap-2">
-          <DuplicateManager />
           <Button
             onClick={async () => {
               if (!confirm('Deseja vincular certificados órfãos a clientes existentes ou criar novos cadastros?')) return;
