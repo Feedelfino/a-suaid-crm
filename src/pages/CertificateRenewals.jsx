@@ -160,11 +160,8 @@ export default function CertificateRenewals() {
         renewal_status: 'nao_renovado'
       });
 
-      toast.success('Interação registrada');
+      toast.success('Interação registrada com sucesso');
       queryClient.invalidateQueries(['clients-with-certificates']);
-      
-      // Redirecionar para interações
-      navigate(createPageUrl('Interactions'));
     } catch (error) {
       toast.error('Erro ao registrar');
     }
