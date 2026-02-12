@@ -66,8 +66,6 @@ import Home from './pages/Home';
 import Interactions from './pages/Interactions';
 import MigrationControl from './pages/MigrationControl';
 import Notes from './pages/Notes';
-import Renewals from './pages/Renewals';
-import RenewalsDashboard from './pages/RenewalsDashboard';
 import Reports from './pages/Reports';
 import SalesPipeline from './pages/SalesPipeline';
 import Schedule from './pages/Schedule';
@@ -95,8 +93,6 @@ export const PAGES = {
     "Interactions": Interactions,
     "MigrationControl": MigrationControl,
     "Notes": Notes,
-    "Renewals": Renewals,
-    "RenewalsDashboard": RenewalsDashboard,
     "Reports": Reports,
     "SalesPipeline": SalesPipeline,
     "Schedule": Schedule,
