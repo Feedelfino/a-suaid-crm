@@ -102,10 +102,56 @@ export default function ClientForm() {
     }
   }, [client]);
 
+  const { data: currentUser } = useQuery({
+    queryKey: ['current-user-form'],
+    queryFn: () => base44.auth.me(),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       if (clientId) {
-        return base44.entities.Client.update(clientId, data);
+        // Detectar campos alterados para registrar no histórico
+        const changedFields = [];
+        const fieldLabels = {
+          client_name: 'Nome', company_name: 'Empresa', cpf: 'CPF', cnpj: 'CNPJ',
+          phone: 'Telefone', whatsapp: 'WhatsApp', email: 'E-mail',
+          business_area: 'Área de Atuação', lead_status: 'Status do Lead',
+          lead_source: 'Origem', notes: 'Observações',
+          has_certificate: 'Possui Certificado', certificate_type: 'Tipo de Certificado',
+          certificate_expiry_date: 'Validade do Certificado',
+          has_service: 'Possui Serviço', service_type: 'Tipo de Serviço',
+          service_expiry_date: 'Vencimento do Serviço', renewal_status: 'Status de Renovação',
+          instagram: 'Instagram', linkedin: 'LinkedIn', website: 'Site',
+        };
+
+        if (client) {
+          Object.keys(fieldLabels).forEach(field => {
+            const oldVal = client[field] ?? '';
+            const newVal = data[field] ?? '';
+            if (String(oldVal) !== String(newVal)) {
+              changedFields.push(`${fieldLabels[field]}: "${oldVal || '(vazio)'}" → "${newVal || '(vazio')"}"`);
+            }
+          });
+        }
+
+        const result = await base44.entities.Client.update(clientId, data);
+
+        // Registrar interação de alteração cadastral se houve mudanças
+        if (changedFields.length > 0 && currentUser) {
+          const nowSP = formatInTimeZone(new Date(), 'America/Sao_Paulo', "dd/MM/yyyy 'às' HH:mm");
+          await base44.entities.Interaction.create({
+            client_id: clientId,
+            client_name: data.client_name,
+            type: 'alteracao_cadastral',
+            channel: 'sistema',
+            outcome: 'cadastro_atualizado',
+            notes: `Alteração cadastral em ${nowSP} (horário de Brasília)\n\nCampos alterados:\n• ${changedFields.join('\n• ')}`,
+            agent_email: currentUser.email,
+          });
+        }
+
+        return result;
       } else {
         return base44.entities.Client.create(data);
       }
