@@ -204,23 +204,33 @@ export default function ClientDetails() {
               ) : (
                 <div className="space-y-4">
                   {interactions.map((interaction) => {
-                    const Icon = interactionIcons[interaction.interaction_type] || MessageSquare;
+                    const isCadastral = interaction.type === 'alteracao_cadastral';
+                    const Icon = isCadastral ? ClipboardEdit : (interactionIcons[interaction.interaction_type] || MessageSquare);
                     return (
-                      <div 
-                        key={interaction.id} 
-                        className="flex gap-4 p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
+                      <div
+                        key={interaction.id}
+                        className={`flex gap-4 p-4 rounded-xl transition-colors ${
+                          isCadastral
+                            ? 'bg-blue-50 hover:bg-blue-100 border border-blue-100'
+                            : 'bg-slate-50 hover:bg-slate-100'
+                        }`}
                       >
-                        <div className="w-10 h-10 rounded-xl bg-[#6B2D8B]/10 flex items-center justify-center shrink-0">
-                          <Icon className="w-5 h-5 text-[#6B2D8B]" />
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                          isCadastral ? 'bg-blue-100' : 'bg-[#6B2D8B]/10'
+                        }`}>
+                          <Icon className={`w-5 h-5 ${isCadastral ? 'text-blue-600' : 'text-[#6B2D8B]'}`} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
                             <div>
                               <div className="flex items-center gap-2">
-                                <p className="font-medium text-slate-800 capitalize">
-                                  {interaction.interaction_type?.replace('_', ' ')}
+                                <p className={`font-medium capitalize ${isCadastral ? 'text-blue-800' : 'text-slate-800'}`}>
+                                  {isCadastral ? 'Alteração Cadastral' : interaction.interaction_type?.replace(/_/g, ' ')}
                                 </p>
-                                {interaction.protocol_number && (
+                                {isCadastral && (
+                                  <Badge className="bg-blue-100 text-blue-700 text-xs">Sistema</Badge>
+                                )}
+                                {interaction.protocol_number && !isCadastral && (
                                   <Badge variant="outline" className="text-xs font-mono">
                                     #{interaction.protocol_number}
                                   </Badge>
@@ -228,11 +238,11 @@ export default function ClientDetails() {
                               </div>
                               {interaction.product_offered && (
                                 <p className="text-sm text-slate-500">
-                                  Produto: {interaction.product_offered.replace('_', ' ')}
+                                  Produto: {interaction.product_offered.replace(/_/g, ' ')}
                                 </p>
                               )}
                             </div>
-                            <span className="text-xs text-slate-400">
+                            <span className="text-xs text-slate-400 shrink-0">
                               {interaction.created_date && (() => {
                                 const utcDate = new Date(interaction.created_date);
                                 const zonedDate = toZonedTime(utcDate, 'America/Sao_Paulo');
@@ -241,7 +251,9 @@ export default function ClientDetails() {
                             </span>
                           </div>
                           {interaction.notes && (
-                            <p className="text-sm text-slate-600 mt-2">{interaction.notes}</p>
+                            <p className={`text-sm mt-2 whitespace-pre-line ${isCadastral ? 'text-blue-700' : 'text-slate-600'}`}>
+                              {interaction.notes}
+                            </p>
                           )}
                           {interaction.sale_value && (
                             <Badge className="mt-2 bg-emerald-100 text-emerald-700">
