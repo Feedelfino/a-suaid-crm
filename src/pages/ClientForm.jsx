@@ -130,7 +130,9 @@ export default function ClientForm() {
             const oldVal = client[field] ?? '';
             const newVal = data[field] ?? '';
             if (String(oldVal) !== String(newVal)) {
-              changedFields.push(`${fieldLabels[field]}: "${oldVal || '(vazio)'}" → "${newVal || '(vazio')"}"`);
+              const oldDisplay = oldVal === '' || oldVal === false || oldVal === null ? '(vazio)' : String(oldVal);
+              const newDisplay = newVal === '' || newVal === false || newVal === null ? '(vazio)' : String(newVal);
+              changedFields.push(`${fieldLabels[field]}: "${oldDisplay}" → "${newDisplay}"`);;
             }
           });
         }
