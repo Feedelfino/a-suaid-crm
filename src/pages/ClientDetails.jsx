@@ -8,7 +8,7 @@ import { toZonedTime } from 'date-fns-tz';
 import { 
   ArrowLeft, Edit, Phone, Mail, Building2, Calendar,
   MessageSquare, CheckCircle, Clock, AlertTriangle,
-  Video, MapPin, DollarSign, Plus, User, FileText, RefreshCw
+  Video, MapPin, DollarSign, Plus, User, FileText, RefreshCw, ClipboardEdit
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
