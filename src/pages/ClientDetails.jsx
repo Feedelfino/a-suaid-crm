@@ -124,6 +124,7 @@ export default function ClientDetails() {
     venda_fechada: DollarSign,
     parceria: Building2,
     sem_interesse: AlertTriangle,
+    alteracao_cadastral: ClipboardEdit,
   };
 
   return (
