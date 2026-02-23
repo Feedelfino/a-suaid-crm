@@ -71,11 +71,23 @@ export default function ClientDetails() {
 
   const createInteractionMutation = useMutation({
     mutationFn: (data) => base44.entities.Interaction.create({
-      ...data,
       client_id: clientId,
       client_name: client?.client_name,
-      agent_name: user?.full_name,
       agent_email: user?.email,
+      // Mapeia campos do formulário para o schema da entidade
+      type: data.interaction_type || data.type,
+      channel: data.contact_method || data.channel || 'whatsapp',
+      outcome: data.tabulation || data.outcome || 'tentativa_feita',
+      protocol_number: data.protocol_number,
+      notes: data.notes,
+      product_offered: data.product_offered,
+      sale_value: data.sale_value,
+      had_discount: data.had_discount,
+      discount_percent: data.discount_percent,
+      followup_date: data.followup_date,
+      no_interest_reason: data.no_interest_reason,
+      products_client_has: data.products_client_has,
+      partnership_type: data.partnership_type,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries(['interactions', clientId]);
