@@ -238,7 +238,7 @@ export default function ClientDetails() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <p className={`font-medium capitalize ${isCadastral ? 'text-blue-800' : 'text-slate-800'}`}>
-                                  {isCadastral ? 'Alteração Cadastral' : interaction.interaction_type?.replace(/_/g, ' ')}
+                                  {isCadastral ? 'Alteração Cadastral' : interactionType?.replace(/_/g, ' ')}
                                 </p>
                                 {isCadastral && (
                                   <Badge className="bg-blue-100 text-blue-700 text-xs">Sistema</Badge>
