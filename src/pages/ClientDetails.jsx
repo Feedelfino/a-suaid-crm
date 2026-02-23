@@ -217,7 +217,8 @@ export default function ClientDetails() {
                 <div className="space-y-4">
                   {interactions.map((interaction) => {
                     const isCadastral = interaction.type === 'alteracao_cadastral';
-                    const Icon = isCadastral ? ClipboardEdit : (interactionIcons[interaction.interaction_type] || MessageSquare);
+                    const interactionType = interaction.type || interaction.interaction_type;
+                    const Icon = isCadastral ? ClipboardEdit : (interactionIcons[interactionType] || MessageSquare);
                     return (
                       <div
                         key={interaction.id}
