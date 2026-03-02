@@ -120,6 +120,99 @@ export default function Reports() {
     },
   });
 
+  // Fetch all interactions for attempts report
+  const { data: allInteractions = [], isLoading: attemptsLoading } = useQuery({
+    queryKey: ['reports-all-interactions', startDate, endDate],
+    queryFn: async () => {
+      const all = await base44.entities.Interaction.list('-created_date', 5000);
+      return all.filter(item => {
+        if (!item.created_date) return false;
+        const date = parseISO(item.created_date);
+        return isWithinInterval(date, { start: parseISO(startDate), end: parseISO(endDate) });
+      });
+    },
+  });
+
+  // Fetch user access for agent list
+  const { data: userAccessList = [] } = useQuery({
+    queryKey: ['user-access-list'],
+    queryFn: () => base44.entities.UserAccess.filter({ status: 'approved' }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const attemptTypes = [
+    'tentativa_email',
+    'tentativa_telefone',
+    'tentativa_whatsapp',
+    'call',
+    'whatsapp',
+    'email',
+    'followup',
+    'contato_sucesso',
+    'followup_agendado',
+    'cliente_indeciso',
+    'sem_interesse',
+    'parceria',
+    'alteracao_cadastral',
+    'meeting',
+    'proposal_sent',
+  ];
+
+  const typeLabels = {
+    tentativa_email: 'Tentativa E-mail',
+    tentativa_telefone: 'Tentativa Telefone',
+    tentativa_whatsapp: 'Tentativa WhatsApp',
+    call: 'Ligação',
+    whatsapp: 'WhatsApp',
+    email: 'E-mail',
+    followup: 'Follow-up',
+    contato_sucesso: 'Contato com Sucesso',
+    followup_agendado: 'Follow-up Agendado',
+    cliente_indeciso: 'Cliente Indeciso',
+    sem_interesse: 'Sem Interesse',
+    parceria: 'Parceria',
+    alteracao_cadastral: 'Alteração Cadastral',
+    meeting: 'Reunião',
+    proposal_sent: 'Proposta Enviada',
+  };
+
+  const channelLabels = {
+    whatsapp: 'WhatsApp',
+    phone: 'Telefone',
+    instagram: 'Instagram',
+    email: 'E-mail',
+    presencial: 'Presencial',
+    sistema: 'Sistema',
+  };
+
+  const outcomeLabels = {
+    success: 'Sucesso',
+    no_answer: 'Sem Resposta',
+    scheduled: 'Agendado',
+    lost: 'Perdido',
+    tentativa_sem_sucesso: 'Tentativa Sem Sucesso',
+    tentativa_feita: 'Tentativa Feita',
+    indeciso_agendado: 'Indeciso Agendado',
+    sem_interesse: 'Sem Interesse',
+    retornar_90_dias: 'Retornar em 90 dias',
+    cadastro_atualizado: 'Cadastro Atualizado',
+  };
+
+  const filteredAttempts = attemptsAgent === 'all'
+    ? allInteractions
+    : allInteractions.filter(i => i.agent_email === attemptsAgent);
+
+  const attemptsSummary = attemptTypes.map(type => ({
+    type,
+    label: typeLabels[type] || type,
+    count: filteredAttempts.filter(i => i.type === type).length,
+  })).filter(s => s.count > 0).sort((a, b) => b.count - a.count);
+
+  const agentOptions = userAccessList.map(u => ({
+    email: u.user_email,
+    name: u.nickname || u.user_name || u.user_email,
+  }));
+
   const [exporting, setExporting] = useState(false);
 
   const exportToSheets = async (data, title) => {
