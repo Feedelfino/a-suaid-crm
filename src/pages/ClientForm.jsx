@@ -5,7 +5,6 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { formatInTimeZone } from 'date-fns-tz';
 import { ArrowLeft, Save, User, Building2, Phone, Mail, MapPin, FileText, RefreshCw } from 'lucide-react';
-import ClientSummaryCard from '@/components/crm/ClientSummaryCard';
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
