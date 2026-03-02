@@ -284,6 +284,10 @@ export default function Reports() {
           <TabsTrigger value="sales">Vendas Detalhadas</TabsTrigger>
           <TabsTrigger value="agents">Por Agente</TabsTrigger>
           <TabsTrigger value="products">Por Produto</TabsTrigger>
+          <TabsTrigger value="attempts" className="gap-2">
+            <PhoneMissed className="w-4 h-4" />
+            Tentativas
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-6">
