@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import InteractionForm from '@/components/crm/InteractionForm';
+import ClientSummaryCard from '@/components/crm/ClientSummaryCard';
 import WhatsAppAIAssistant from '@/components/whatsapp/WhatsAppAIAssistant';
 import EmailAIAssistant from '@/components/email/EmailAIAssistant';
 import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
