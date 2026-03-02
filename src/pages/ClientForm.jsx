@@ -202,7 +202,7 @@ export default function ClientForm() {
       </div>
 
       {/* Resumo visual do cadastro */}
-      {clientId && <ClientSummaryCard data={formData} />}
+      <ClientSummaryCard data={formData} />
 
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6">
