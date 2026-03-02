@@ -200,8 +200,7 @@ export default function ClientForm() {
         </div>
       </div>
 
-      {/* Resumo visual do cadastro */}
-      <ClientSummaryCard data={formData} />
+
 
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6">
