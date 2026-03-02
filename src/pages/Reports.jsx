@@ -645,6 +645,145 @@ export default function Reports() {
             </CardContent>
           </Card>
         </TabsContent>
+        <TabsContent value="attempts" className="mt-6">
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4">
+              <CardTitle className="flex items-center gap-2">
+                <PhoneMissed className="w-5 h-5 text-[#6B2D8B]" />
+                Relatório de Tentativas de Interação
+              </CardTitle>
+              <div className="flex items-center gap-3 flex-wrap">
+                <Select value={attemptsAgent} onValueChange={setAttemptsAgent}>
+                  <SelectTrigger className="w-52">
+                    <SelectValue placeholder="Filtrar por agente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Agentes</SelectItem>
+                    {agentOptions.map(a => (
+                      <SelectItem key={a.email} value={a.email}>{a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportToSheets(
+                    filteredAttempts.map(i => ({
+                      'Cliente': i.client_name || '-',
+                      'Tipo': typeLabels[i.type] || i.type,
+                      'Canal': channelLabels[i.channel] || i.channel,
+                      'Resultado': outcomeLabels[i.outcome] || i.outcome,
+                      'Agente': i.agent_email,
+                      'Data': i.created_date ? format(parseISO(i.created_date), 'dd/MM/yyyy HH:mm') : '-',
+                      'Observações': i.notes || '',
+                    })),
+                    'Tentativas de Interação'
+                  )}
+                  disabled={exporting || attemptsLoading}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Exportar
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {attemptsLoading ? (
+                <div className="text-center py-8">Carregando...</div>
+              ) : (
+                <>
+                  {/* Summary cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                      <CardContent className="p-4">
+                        <p className="text-xs text-purple-600 font-medium">Total de Interações</p>
+                        <p className="text-2xl font-bold text-purple-900">{filteredAttempts.length}</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                      <CardContent className="p-4">
+                        <p className="text-xs text-blue-600 font-medium">Tentativas sem Sucesso</p>
+                        <p className="text-2xl font-bold text-blue-900">
+                          {filteredAttempts.filter(i => ['tentativa_sem_sucesso','tentativa_feita','no_answer'].includes(i.outcome)).length}
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                      <CardContent className="p-4">
+                        <p className="text-xs text-green-600 font-medium">Contatos com Sucesso</p>
+                        <p className="text-2xl font-bold text-green-900">
+                          {filteredAttempts.filter(i => i.outcome === 'success').length}
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+                      <CardContent className="p-4">
+                        <p className="text-xs text-orange-600 font-medium">Agendamentos</p>
+                        <p className="text-2xl font-bold text-orange-900">
+                          {filteredAttempts.filter(i => i.outcome === 'scheduled' || i.outcome === 'indeciso_agendado' || i.outcome === 'followup_agendado').length}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Summary by type */}
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-slate-700 mb-3">Resumo por Tipo</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                      {attemptsSummary.map(s => (
+                        <div key={s.type} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
+                          <span className="text-sm text-slate-600">{s.label}</span>
+                          <span className="text-sm font-bold text-[#6B2D8B]">{s.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Detail table */}
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Cliente</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Canal</TableHead>
+                          <TableHead>Resultado</TableHead>
+                          <TableHead>Agente</TableHead>
+                          <TableHead>Data</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredAttempts.map((i) => (
+                          <TableRow key={i.id}>
+                            <TableCell className="font-medium">{i.client_name || '-'}</TableCell>
+                            <TableCell>{typeLabels[i.type] || i.type}</TableCell>
+                            <TableCell>{channelLabels[i.channel] || i.channel}</TableCell>
+                            <TableCell>
+                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                i.outcome === 'success' ? 'bg-green-100 text-green-700' :
+                                i.outcome === 'scheduled' ? 'bg-blue-100 text-blue-700' :
+                                i.outcome === 'lost' || i.outcome === 'sem_interesse' ? 'bg-red-100 text-red-700' :
+                                'bg-slate-100 text-slate-600'
+                              }`}>
+                                {outcomeLabels[i.outcome] || i.outcome}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-sm text-slate-500">{i.agent_email}</TableCell>
+                            <TableCell className="text-sm text-slate-500">
+                              {i.created_date ? format(parseISO(i.created_date), 'dd/MM/yyyy HH:mm') : '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {filteredAttempts.length === 0 && (
+                      <p className="text-center py-8 text-slate-500">Nenhuma interação no período</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
