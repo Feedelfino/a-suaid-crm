@@ -3,8 +3,15 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { 
-  FileText, Download, BarChart3, TrendingUp, Sparkles, Phone, Users, DollarSign, PieChart, LineChart as LineChartIcon
+  FileText, Download, BarChart3, TrendingUp, Sparkles, Phone, Users, DollarSign, PieChart, LineChart as LineChartIcon, PhoneMissed
 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
