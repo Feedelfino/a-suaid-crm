@@ -33,6 +33,7 @@ import {
 export default function Reports() {
   const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [attemptsAgent, setAttemptsAgent] = useState('all');
 
   // Fetch raw data for charts
   const { data: rawInteractions = [] } = useQuery({
