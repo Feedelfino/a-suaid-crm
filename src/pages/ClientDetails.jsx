@@ -184,6 +184,8 @@ export default function ClientDetails() {
         </div>
       </div>
 
+      <ClientSummaryCard data={client} />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Interactions History */}
         <div className="lg:col-span-2 space-y-6">
