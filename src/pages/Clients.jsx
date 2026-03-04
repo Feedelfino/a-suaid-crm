@@ -189,8 +189,11 @@ export default function Clients() {
     
     const matchesStatus = statusFilter === 'all' || client.lead_status === statusFilter;
     const matchesSource = sourceFilter === 'all' || client.lead_source === sourceFilter;
+    const matchesInstagram = instagramFilter === 'all' 
+      || (instagramFilter === 'com_instagram' && client.instagram)
+      || (instagramFilter === 'sem_instagram' && !client.instagram);
     
-    return matchesSearch && matchesStatus && matchesSource;
+    return matchesSearch && matchesStatus && matchesSource && matchesInstagram;
   });
 
   const statusColors = {
