@@ -390,6 +390,16 @@ export default function Clients() {
                 <SelectItem value="outro">Outro</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={instagramFilter} onValueChange={setInstagramFilter}>
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Instagram" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos (Instagram)</SelectItem>
+                <SelectItem value="com_instagram">Com Instagram</SelectItem>
+                <SelectItem value="sem_instagram">Sem Instagram</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
