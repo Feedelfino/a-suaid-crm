@@ -41,6 +41,7 @@ export default function Clients() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [showDuplicateManager, setShowDuplicateManager] = useState(false);
+  const [instagramFilter, setInstagramFilter] = useState('all');
 
   const { data: user } = useQuery({
     queryKey: ['current-user'],
