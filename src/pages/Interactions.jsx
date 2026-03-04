@@ -29,15 +29,23 @@ export default function Interactions() {
     try {
       const allClients = await base44.entities.Client.list();
       const term = searchTerm.toLowerCase();
+      const termDigits = term.replace(/\D/g, '');
       
-      const filtered = allClients.filter(client => 
-        client.client_name?.toLowerCase().includes(term) ||
-        client.company_name?.toLowerCase().includes(term) ||
-        client.phone?.includes(term) ||
-        client.cpf?.includes(term) ||
-        client.cnpj?.includes(term) ||
-        client.email?.toLowerCase().includes(term)
-      );
+      const filtered = allClients.filter(client => {
+        const phoneDigits = (client.phone || '').replace(/\D/g, '');
+        const whatsappDigits = (client.whatsapp || '').replace(/\D/g, '');
+        const cpfDigits = (client.cpf || '').replace(/\D/g, '');
+        const cnpjDigits = (client.cnpj || '').replace(/\D/g, '');
+        return (
+          client.client_name?.toLowerCase().includes(term) ||
+          client.company_name?.toLowerCase().includes(term) ||
+          client.email?.toLowerCase().includes(term) ||
+          (termDigits && phoneDigits.includes(termDigits)) ||
+          (termDigits && whatsappDigits.includes(termDigits)) ||
+          (termDigits && cpfDigits.includes(termDigits)) ||
+          (termDigits && cnpjDigits.includes(termDigits))
+        );
+      });
       
       setSearchResults(filtered);
     } catch (error) {
