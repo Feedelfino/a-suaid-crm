@@ -196,6 +196,8 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading, clientI
               <SelectItem value="tentativa_email">Tentativa - E-mail</SelectItem>
               <SelectItem value="tentativa_telefone">Tentativa - Telefone</SelectItem>
               <SelectItem value="tentativa_whatsapp">Tentativa - WhatsApp</SelectItem>
+              <SelectItem value="tentativa_instagram">Tentativa - Instagram</SelectItem>
+              <SelectItem value="tentativa_linkedin">Tentativa - LinkedIn</SelectItem>
               <SelectItem value="contato_sucesso">Contato com sucesso</SelectItem>
               <SelectItem value="followup_agendado">Follow-up agendado</SelectItem>
               <SelectItem value="cliente_indeciso">Cliente indeciso</SelectItem>
@@ -203,24 +205,6 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading, clientI
               <SelectItem value="venda_fechada">Venda fechada</SelectItem>
               <SelectItem value="parceria">Parceria</SelectItem>
               <SelectItem value="sem_interesse">Sem interesse</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Forma de Contato</Label>
-          <Select 
-            value={formData.contact_method} 
-            onValueChange={(v) => handleChange('contact_method', v)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="whatsapp">WhatsApp</SelectItem>
-              <SelectItem value="email">E-mail</SelectItem>
-              <SelectItem value="telefone">Telefone</SelectItem>
-              <SelectItem value="presencial">Presencial</SelectItem>
             </SelectContent>
           </Select>
         </div>
