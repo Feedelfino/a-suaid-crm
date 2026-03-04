@@ -180,12 +180,17 @@ export default function Clients() {
   }, [clients, duplicates]);
 
   const filteredClients = clients.filter(client => {
+    const term = searchTerm.toLowerCase();
+    const termDigits = searchTerm.replace(/\D/g, '');
+    const phoneDigits = (client.phone || '').replace(/\D/g, '');
+    const whatsappDigits = (client.whatsapp || '').replace(/\D/g, '');
     const matchesSearch = !searchTerm || 
-      client.client_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.phone?.includes(searchTerm) ||
-      client.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      client.client_code?.toLowerCase().includes(term) ||
+      client.client_name?.toLowerCase().includes(term) ||
+      client.company_name?.toLowerCase().includes(term) ||
+      client.email?.toLowerCase().includes(term) ||
+      (termDigits && phoneDigits.includes(termDigits)) ||
+      (termDigits && whatsappDigits.includes(termDigits));
     
     const matchesStatus = statusFilter === 'all' || client.lead_status === statusFilter;
     const matchesSource = sourceFilter === 'all' || client.lead_source === sourceFilter;
