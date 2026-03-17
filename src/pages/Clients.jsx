@@ -179,7 +179,7 @@ export default function Clients() {
     };
   }, [clients]);
 
-  // Estatísticas de contatos
+  // FRONTEND: calcula estatísticas de contatos (total, com telefone, e-mail, WhatsApp e duplicados)
   const contactStats = React.useMemo(() => {
     return {
       total: clients.length,
