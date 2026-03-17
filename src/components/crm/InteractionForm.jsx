@@ -1,3 +1,13 @@
+// ============================================================
+// FRONTEND — Componente: Formulário de Interação
+// Permite registrar uma interação com um cliente.
+// Funcionalidades automáticas ao submeter:
+//   - Gera um número de protocolo único
+//   - Cria agendamento e tarefa de follow-up se necessário
+//   - Atualiza automaticamente a etapa do funil do cliente
+// Usado dentro da página ClientDetails.
+// ============================================================
+
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { formatInTimeZone } from 'date-fns-tz';
