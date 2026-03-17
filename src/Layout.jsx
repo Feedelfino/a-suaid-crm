@@ -51,36 +51,39 @@ import AccessDenied from '@/pages/AccessDenied';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
 
 export default function Layout({ children, currentPageName }) {
-  const [user, setUser] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [accessStatus, setAccessStatus] = useState(null); // 'approved', 'pending', 'rejected', null
+  const [user, setUser] = useState(null);                       // Dados do usuário logado
+  const [sidebarOpen, setSidebarOpen] = useState(false);        // Controla abertura da sidebar no mobile
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Controla colapso da sidebar no desktop
+  const [isLoading, setIsLoading] = useState(true);             // Exibe spinner enquanto verifica acesso
+  const [accessStatus, setAccessStatus] = useState(null);       // Status de acesso: 'approved', 'pending', 'rejected'
 
+  // Roda ao montar: verifica autenticação e permissões do usuário
   useEffect(() => {
     const checkAccess = async () => {
       try {
+        // BACKEND: verifica se existe uma sessão ativa
         const authenticated = await base44.auth.isAuthenticated();
         if (!authenticated) {
-          base44.auth.redirectToLogin();
+          base44.auth.redirectToLogin(); // Redireciona para login se não autenticado
           return;
         }
         
+        // BACKEND: obtém os dados completos do usuário autenticado
         const userData = await base44.auth.me();
         setUser(userData);
 
-        // Admins always have access
+        // Administradores têm acesso imediato sem precisar de aprovação
         if (userData.role === 'admin') {
           setAccessStatus('approved');
           setIsLoading(false);
           return;
         }
 
-        // Check user access status
+        // BACKEND: busca o registro de acesso do usuário na entidade UserAccess
         const accessRecords = await base44.entities.UserAccess.filter({ user_email: userData.email });
         
         if (accessRecords.length === 0) {
-          // First time user - create pending access request
+          // Primeiro acesso: cria registro pendente aguardando aprovação do admin
           await base44.entities.UserAccess.create({
             user_email: userData.email,
             user_name: userData.full_name,
@@ -88,11 +91,12 @@ export default function Layout({ children, currentPageName }) {
           });
           setAccessStatus('pending');
         } else {
+          // Usa o status já cadastrado (approved/pending/rejected)
           const access = accessRecords[0];
           setAccessStatus(access.status);
         }
       } catch (e) {
-        console.log('Auth error:', e);
+        console.log('Erro de autenticação:', e);
         base44.auth.redirectToLogin();
       } finally {
         setIsLoading(false);
