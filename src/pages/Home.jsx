@@ -39,28 +39,32 @@ import { Progress } from "@/components/ui/progress";
 
 export default function Home() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const { getDisplayName } = useUserDisplayName();
+  const [user, setUser] = useState(null); // Estado local para armazenar os dados do usuário logado
+  const { getDisplayName } = useUserDisplayName(); // Retorna o nome/apelido configurado para exibição
 
+  // useEffect roda uma vez ao montar o componente para carregar os dados do usuário
   useEffect(() => {
     const loadUser = async () => {
       try {
+        // BACKEND: busca os dados do usuário autenticado via SDK
         const userData = await base44.auth.me();
         setUser(userData);
-        // Generate notifications for the user
+        // Gera notificações automáticas com base nas tarefas e metas do usuário
         checkAndCreateNotifications(userData.email);
       } catch (e) {
-        console.log('Not logged in');
+        console.log('Usuário não logado');
       }
     };
     loadUser();
   }, []);
 
+  // BACKEND: busca as tarefas com status "pendente" da entidade Task
   const { data: tasks = [] } = useQuery({
     queryKey: ['tasks-today'],
     queryFn: () => base44.entities.Task.filter({ status: 'pendente' }, '-due_date', 20),
   });
 
+  // BACKEND: busca os agendamentos de hoje que não estão cancelados ou concluídos
   const { data: appointments = [] } = useQuery({
     queryKey: ['appointments-today'],
     queryFn: () => base44.entities.Appointment.filter({ 
@@ -69,11 +73,13 @@ export default function Home() {
     }, 'time', 10),
   });
 
+  // FRONTEND: filtra apenas as tarefas cuja data de vencimento é hoje
   const todayTasks = tasks.filter(t => {
     if (!t.due_date) return false;
     return isToday(parseISO(t.due_date));
   });
 
+  // Mapeamento de tipo de tarefa → ícone visual (usado na listagem de tarefas)
   const taskTypeIcons = {
     reuniao_presencial: MapPin,
     ligacao: Phone,
