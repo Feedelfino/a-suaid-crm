@@ -1,11 +1,19 @@
+// ============================================================
+// FRONTEND — Página inicial (Dashboard do Usuário)
+// Esta página exibe um resumo das atividades do dia:
+// tarefas pendentes, reuniões agendadas e alertas inteligentes.
+// Toda a lógica de busca de dados usa o SDK base44 que se
+// comunica com o BACKEND (entidades e funções) automaticamente.
+// ============================================================
+
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { createPageUrl } from '@/utils';
-import { base44 } from '@/api/base44Client';
-import { useUserDisplayName } from '@/components/hooks/useUserDisplayName';
-import { useQuery } from '@tanstack/react-query';
-import { format, isToday, parseISO, startOfDay } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { Link, useNavigate } from 'react-router-dom'; // Navegação entre páginas (frontend)
+import { createPageUrl } from '@/utils'; // Utilitário para gerar URLs de páginas
+import { base44 } from '@/api/base44Client'; // SDK de conexão com o backend (base44)
+import { useUserDisplayName } from '@/components/hooks/useUserDisplayName'; // Hook para exibir nome/apelido do usuário
+import { useQuery } from '@tanstack/react-query'; // Hook para buscar dados do backend com cache
+import { format, isToday, parseISO, startOfDay } from 'date-fns'; // Utilitários de formatação de datas
+import { ptBR } from 'date-fns/locale'; // Localização em português para exibição de datas
 import { 
   Phone, 
   Calendar, 
