@@ -190,9 +190,10 @@ export default function Clients() {
     };
   }, [clients, duplicates]);
 
+  // FRONTEND: aplica os filtros de busca e seleção (nome, telefone, status, origem, instagram)
   const filteredClients = clients.filter(client => {
     const term = searchTerm.toLowerCase();
-    const termDigits = searchTerm.replace(/\D/g, '');
+    const termDigits = searchTerm.replace(/\D/g, ''); // Remove formatação para buscar por dígitos puros
     const phoneDigits = (client.phone || '').replace(/\D/g, '');
     const whatsappDigits = (client.whatsapp || '').replace(/\D/g, '');
     const matchesSearch = !searchTerm || 
