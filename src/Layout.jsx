@@ -1,5 +1,15 @@
+// ============================================================
+// FRONTEND — Layout Principal da Aplicação
+// Este componente envolve todas as páginas do sistema.
+// Responsável por:
+//   - Verificar autenticação e status de acesso do usuário
+//   - Renderizar a barra lateral (sidebar) e o cabeçalho (header)
+//   - Exibir páginas de bloqueio (AccessPending, AccessDenied) quando necessário
+// O conteúdo de cada página é injetado via {children}
+// ============================================================
+
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router-dom'; // Componente de navegação entre páginas do frontend
 import { createPageUrl } from './utils';
 import { base44 } from '@/api/base44Client';
 import { 
