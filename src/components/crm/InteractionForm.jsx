@@ -119,8 +119,10 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading, clientI
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Gera o protocolo único para esta interação
     const protocolNumber = generateProtocolNumber();
     
+    // Prepara os dados finais da interação para enviar ao backend
     const data = {
       ...formData,
       protocol_number: protocolNumber,
@@ -129,12 +131,14 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading, clientI
       agent_email: user?.email,
     };
 
-    // Se tem follow-up agendado, criar agendamento automaticamente
+    // BACKEND: se a interação gerou um follow-up, cria automaticamente agendamento e tarefa
     if ((formData.interaction_type === 'followup_agendado' || formData.tabulation === 'indeciso_agendado') && formData.followup_date) {
       try {
         const followupDate = new Date(formData.followup_date);
+        // Obtém a data/hora atual no fuso de Brasília para consistência
         const saoPauloTime = formatInTimeZone(new Date(), 'America/Sao_Paulo', "yyyy-MM-dd'T'HH:mm:ssXXX");
         
+        // BACKEND: cria o agendamento na entidade Appointment
         await base44.entities.Appointment.create({
           client_id: clientId,
           client_name: clientName,
