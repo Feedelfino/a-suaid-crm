@@ -155,7 +155,7 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading, clientI
           created_date: saoPauloTime,
         });
 
-        // Criar tarefa de follow-up
+        // BACKEND: cria a tarefa de follow-up vinculada ao agendamento
         await base44.entities.Task.create({
           title: `Follow-up: ${clientName}`,
           task_type: 'followup',
