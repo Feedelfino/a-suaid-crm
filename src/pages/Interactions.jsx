@@ -23,11 +23,13 @@ export default function Interactions() {
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
+  // BACKEND: busca os 10 clientes atualizados mais recentemente para exibir como sugestão inicial
   const { data: recentClients = [] } = useQuery({
     queryKey: ['recent-clients'],
     queryFn: () => base44.entities.Client.list('-updated_date', 10),
   });
 
+  // FRONTEND + BACKEND: realiza busca de clientes com normalização de caracteres especiais
   const handleSearch = async () => {
     if (!searchTerm.trim()) return;
     
@@ -35,10 +37,12 @@ export default function Interactions() {
     setHasSearched(true);
     
     try {
+      // BACKEND: busca todos os clientes para filtrar no frontend
       const allClients = await base44.entities.Client.list();
       const term = searchTerm.toLowerCase();
-      const termDigits = term.replace(/\D/g, '');
+      const termDigits = term.replace(/\D/g, ''); // Remove formatação para comparar apenas dígitos
       
+      // FRONTEND: filtra localmente por nome, empresa, email, telefone, WhatsApp, CPF e CNPJ
       const filtered = allClients.filter(client => {
         const phoneDigits = (client.phone || '').replace(/\D/g, '');
         const whatsappDigits = (client.whatsapp || '').replace(/\D/g, '');
