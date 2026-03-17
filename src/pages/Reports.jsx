@@ -224,8 +224,10 @@ export default function Reports() {
     name: u.nickname || u.user_name || u.user_email,
   }));
 
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState(false); // Controla o estado de carregamento da exportação
 
+  // FRONTEND + BACKEND: função para exportar dados para o Google Sheets
+  // Chama a função backend 'exportReportToSheets' e abre a planilha gerada no navegador
   const exportToSheets = async (data, title) => {
     if (data.length === 0) {
       alert('Nenhum dado para exportar');
@@ -234,8 +236,9 @@ export default function Reports() {
 
     setExporting(true);
     try {
-      const headers = Object.keys(data[0]);
+      const headers = Object.keys(data[0]); // Extrai os cabeçalhos das colunas dinamicamente
       
+      // BACKEND: invoca a função de exportação enviando os dados e título da planilha
       const response = await base44.functions.invoke('exportReportToSheets', {
         data,
         headers,
@@ -243,7 +246,7 @@ export default function Reports() {
       });
 
       if (response.data.success) {
-        window.open(response.data.url, '_blank');
+        window.open(response.data.url, '_blank'); // Abre a planilha gerada em nova aba
       } else {
         alert('Erro ao exportar: ' + (response.data.error || 'Erro desconhecido'));
       }
