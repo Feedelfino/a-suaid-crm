@@ -1,3 +1,11 @@
+// ============================================================
+// FRONTEND — Página de Interações
+// Tela principal para registrar interações com clientes.
+// O usuário busca um cliente pelo nome, telefone, CPF, CNPJ ou e-mail.
+// Ao clicar no resultado, é redirecionado para a página de detalhes
+// do cliente, onde pode registrar a interação.
+// ============================================================
+
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
