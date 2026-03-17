@@ -51,7 +51,7 @@ const generateProtocolNumber = () => {
   return `ATD${year}${month}${day}${random}`;
 };
 
-// Mapeia interação para etapa do funil
+// FRONTEND: determina a etapa do funil de vendas com base no tipo de interação e tabulação
 const getFunnelStageFromInteraction = (interactionType, tabulation) => {
   if (tabulation === 'venda_feita' || interactionType === 'venda_fechada') {
     return 'fechamento';
