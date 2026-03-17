@@ -50,30 +50,34 @@ export default function Clients() {
   const [showDuplicateManager, setShowDuplicateManager] = useState(false);
   const [instagramFilter, setInstagramFilter] = useState('all');
 
+  // BACKEND: busca dados do usuário logado para verificar se é admin
   const { data: user } = useQuery({
     queryKey: ['current-user'],
     queryFn: () => base44.auth.me(),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // Cache de 5 minutos para não sobrecarregar o backend
   });
 
+  // BACKEND: busca todos os clientes ordenados pelo mais recente
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ['clients'],
     queryFn: () => base44.entities.Client.list('-created_date'),
-    staleTime: 10000,
+    staleTime: 10000, // Revalida a cada 10 segundos
   });
 
+  // BACKEND: mutação para excluir um cliente pelo ID
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Client.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries(['clients']);
+      queryClient.invalidateQueries(['clients']); // Atualiza a lista após exclusão
     },
   });
 
+  // BACKEND: chama a função backend 'migrateCertificatesToClients' para migrar dados legados
   const migrateMutation = useMutation({
     mutationFn: () => base44.functions.invoke('migrateCertificatesToClients'),
     onSuccess: (response) => {
       alert(response.data.message);
-      queryClient.invalidateQueries(['clients']);
+      queryClient.invalidateQueries(['clients']); // Atualiza a lista após migração
     },
   });
 
