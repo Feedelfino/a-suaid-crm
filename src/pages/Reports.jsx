@@ -38,15 +38,17 @@ import {
 } from 'recharts';
 
 export default function Reports() {
+  // Estados de filtro por período (início e fim do mês atual por padrão)
   const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
-  const [attemptsAgent, setAttemptsAgent] = useState('all');
+  const [attemptsAgent, setAttemptsAgent] = useState('all'); // Filtro de agente para o relatório de tentativas
 
-  // Fetch raw data for charts
+  // BACKEND: busca interações brutas da entidade Interaction (para uso nos gráficos)
   const { data: rawInteractions = [] } = useQuery({
     queryKey: ['reports-raw-interactions', startDate, endDate],
     queryFn: async () => {
       const allInteractions = await base44.entities.Interaction.list('-created_date', 5000);
+      // FRONTEND: filtra pelo intervalo de datas selecionado
       return allInteractions.filter(item => {
         if (!item.created_date) return false;
         const date = parseISO(item.created_date);
@@ -55,6 +57,7 @@ export default function Reports() {
     },
   });
 
+  // BACKEND: busca todas as ofertas brutas (para gráfico de evolução diária)
   const { data: rawOffers = [] } = useQuery({
     queryKey: ['reports-raw-offers', startDate, endDate],
     queryFn: async () => {
@@ -67,6 +70,7 @@ export default function Reports() {
     },
   });
 
+  // BACKEND: busca todos os negócios fechados (para gráfico ganhos/perdidos)
   const { data: rawDeals = [] } = useQuery({
     queryKey: ['reports-raw-deals', startDate, endDate],
     queryFn: async () => {
@@ -79,7 +83,7 @@ export default function Reports() {
     },
   });
 
-  // Fetch overview data
+  // BACKEND: chama a função backend 'getOverviewReport' para obter resumo geral do período
   const { data: overview, isLoading: overviewLoading } = useQuery({
     queryKey: ['overview-report', startDate, endDate],
     queryFn: async () => {
@@ -91,7 +95,7 @@ export default function Reports() {
     },
   });
 
-  // Fetch detailed sales
+  // BACKEND: chama a função backend 'getDetailedSalesReport' para vendas detalhadas
   const { data: salesReport = [], isLoading: salesLoading } = useQuery({
     queryKey: ['sales-report', startDate, endDate],
     queryFn: async () => {
@@ -103,7 +107,7 @@ export default function Reports() {
     },
   });
 
-  // Fetch agent performance
+  // BACKEND: chama a função backend 'getAgentPerformanceReport' para desempenho por agente
   const { data: agentReport = [], isLoading: agentsLoading } = useQuery({
     queryKey: ['agent-report', startDate, endDate],
     queryFn: async () => {
@@ -115,7 +119,7 @@ export default function Reports() {
     },
   });
 
-  // Fetch product performance
+  // BACKEND: chama a função backend 'getProductPerformanceReport' para desempenho por produto
   const { data: productReport = [], isLoading: productsLoading } = useQuery({
     queryKey: ['product-report', startDate, endDate],
     queryFn: async () => {
@@ -127,7 +131,7 @@ export default function Reports() {
     },
   });
 
-  // Fetch all interactions for attempts report
+  // BACKEND: busca todas as interações para o relatório de tentativas de contato
   const { data: allInteractions = [], isLoading: attemptsLoading } = useQuery({
     queryKey: ['reports-all-interactions', startDate, endDate],
     queryFn: async () => {
@@ -140,11 +144,11 @@ export default function Reports() {
     },
   });
 
-  // Fetch user access for agent list
+  // BACKEND: busca lista de usuários aprovados para montar o filtro de agentes
   const { data: userAccessList = [] } = useQuery({
     queryKey: ['user-access-list'],
     queryFn: () => base44.entities.UserAccess.filter({ status: 'approved' }),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // Cache por 5 minutos (dado pouco volátil)
   });
 
   const attemptTypes = [
