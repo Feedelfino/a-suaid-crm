@@ -120,7 +120,7 @@ export default function Clients() {
     return (longer.length - editDistance(longer, shorter)) / longer.length;
   };
 
-  // Detectar duplicados por CPF, CNPJ, Email e Nome similar
+  // FRONTEND: detecta registros duplicados por CPF, CNPJ, E-mail e nome similar (Levenshtein)
   const duplicates = React.useMemo(() => {
     const cpfMap = {};
     const cnpjMap = {};
