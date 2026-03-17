@@ -1,5 +1,12 @@
+// ============================================================
+// FRONTEND — Página de Relatórios
+// Exibe relatórios de vendas, interações, desempenho por agente
+// e por produto, com filtro por período e exportação para Sheets.
+// Os dados são buscados no BACKEND via funções e entidades base44.
+// ============================================================
+
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { base44 } from '@/api/base44Client'; // SDK de conexão com o backend (base44)
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { 
