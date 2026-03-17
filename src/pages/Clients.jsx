@@ -1,3 +1,10 @@
+// ============================================================
+// FRONTEND — Página de Cadastros (Lista de Clientes)
+// Exibe todos os clientes com filtros por status, origem e Instagram.
+// Detecta automaticamente registros duplicados (CPF, CNPJ, e-mail e nome similar).
+// Dados são buscados no BACKEND via SDK base44 (entidade Client).
+// ============================================================
+
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
