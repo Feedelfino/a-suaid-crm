@@ -41,7 +41,7 @@ const PRODUCTS = [
   { value: 'outro', label: 'Outro' },
 ];
 
-// Gera número de protocolo único
+// FRONTEND: gera um número de protocolo único no formato ATDyyyyMMDDxxxx
 const generateProtocolNumber = () => {
   const date = new Date();
   const year = date.getFullYear();
