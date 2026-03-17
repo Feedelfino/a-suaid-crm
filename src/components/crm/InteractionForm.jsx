@@ -172,12 +172,13 @@ export default function InteractionForm({ onSubmit, onCancel, isLoading, clientI
       }
     }
 
-    // Atualizar funil do cliente automaticamente
+    // BACKEND: atualiza automaticamente a etapa do funil de vendas do cliente
     const newFunnelStage = getFunnelStageFromInteraction(formData.interaction_type, formData.tabulation);
     if (newFunnelStage && clientId) {
       try {
         const saoPauloTime = formatInTimeZone(new Date(), 'America/Sao_Paulo', "yyyy-MM-dd'T'HH:mm:ssXXX");
         
+        // Persiste a nova etapa do funil e a data da atualização
         await base44.entities.Client.update(clientId, {
           funnel_stage: newFunnelStage,
           funnel_updated_at: saoPauloTime,
